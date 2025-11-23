@@ -1,4 +1,11 @@
+import 'react-native-gesture-handler';
+import { Platform } from 'react-native';
 import { registerRootComponent } from 'expo';
+
+// Polyfill Buffer for web
+if (Platform.OS === 'web') {
+  global.Buffer = require('buffer').Buffer;
+}
 
 import App from './App';
 
