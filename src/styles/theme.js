@@ -1,17 +1,19 @@
 export const theme = {
   colors: {
-    primary: '#2196F3', // Blue
-    primaryDark: '#1976D2',
-    primaryLight: '#64B5F6',
+    primary: '#1D4ED8',
+    primaryDark: '#1E3A8A',
+    primaryLight: '#93C5FD',
+    accent: '#16A34A',
     secondary: '#FFFFFF',
-    background: '#F5F5F5',
+    background: '#F5F7FB',
     surface: '#FFFFFF',
-    text: '#212121',
-    textSecondary: '#757575',
-    error: '#F44336',
-    success: '#4CAF50',
-    warning: '#FF9800',
-    border: '#E0E0E0',
+    surfaceAlt: '#F0F4FF',
+    text: '#0F172A',
+    textSecondary: '#4B5563',
+    error: '#DC2626',
+    success: '#16A34A',
+    warning: '#EAB308',
+    border: '#E2E8F0',
   },
   fonts: {
     regular: 'Poppins-Regular',
@@ -30,6 +32,10 @@ export const theme = {
     sm: 8,
     md: 12,
     lg: 16,
+  },
+  gradients: {
+    card: ['#FFFFFF', '#F6F9FF'],
+    highlight: ['#1D4ED8', '#3B82F6'],
   },
   shadows: {
     small: {

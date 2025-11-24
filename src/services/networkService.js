@@ -49,12 +49,34 @@ export const getBalance = async (address, networkKey, isTestnet = false) => {
  */
 export const getTokenBalance = async (address, networkKey, isTestnet = false) => {
   try {
-    const provider = getProvider(networkKey, isTestnet);
-    const tokenAddress = networkKey === 'ETHEREUM' 
-      ? TOKEN_ADDRESSES.USDT_ETHEREUM 
-      : TOKEN_ADDRESSES.USDT_BSC;
+    // Get the correct token address based on network
+    let tokenAddress;
+    if (isTestnet) {
+      tokenAddress = networkKey === 'ETHEREUM' 
+        ? TOKEN_ADDRESSES.USDT_ETHEREUM_TESTNET 
+        : TOKEN_ADDRESSES.USDT_BSC_TESTNET;
+    } else {
+      tokenAddress = networkKey === 'ETHEREUM' 
+        ? TOKEN_ADDRESSES.USDT_ETHEREUM 
+        : TOKEN_ADDRESSES.USDT_BSC;
+    }
     
+    // If token address is null (not available on this network), return zero balance
+    if (!tokenAddress) {
+      console.warn(`USDT not available on ${networkKey} ${isTestnet ? 'testnet' : 'mainnet'}`);
+      return { balance: 0n, decimals: 6 };
+    }
+    
+    const provider = getProvider(networkKey, isTestnet);
     const tokenContract = new ethers.Contract(tokenAddress, ERC20_ABI, provider);
+    
+    // Check if contract exists by trying to read code
+    const code = await provider.getCode(tokenAddress);
+    if (code === '0x' || code === '0x0') {
+      console.warn(`Token contract not found at address ${tokenAddress}`);
+      return { balance: 0n, decimals: 6 };
+    }
+    
     const balance = await tokenContract.balanceOf(address);
     const decimals = await tokenContract.decimals();
     
@@ -65,9 +87,11 @@ export const getTokenBalance = async (address, networkKey, isTestnet = false) =>
     if (
       error.code === 'NETWORK_ERROR' || 
       error.code === 'BAD_DATA' ||
+      error.code === 'CALL_EXCEPTION' ||
       error.message?.includes('Failed to fetch') || 
       error.message?.includes('ERR_NAME_NOT_RESOLVED') ||
-      error.message?.includes('could not decode result')
+      error.message?.includes('could not decode result') ||
+      error.message?.includes('execution reverted')
     ) {
       console.warn('Token balance error, returning zero balance');
       // Default to 6 decimals for USDT
@@ -158,12 +182,24 @@ export const sendTokenTransaction = async (
   isTestnet = false
 ) => {
   try {
+    // Get the correct token address based on network
+    let tokenAddress;
+    if (isTestnet) {
+      tokenAddress = networkKey === 'ETHEREUM' 
+        ? TOKEN_ADDRESSES.USDT_ETHEREUM_TESTNET 
+        : TOKEN_ADDRESSES.USDT_BSC_TESTNET;
+    } else {
+      tokenAddress = networkKey === 'ETHEREUM' 
+        ? TOKEN_ADDRESSES.USDT_ETHEREUM 
+        : TOKEN_ADDRESSES.USDT_BSC;
+    }
+    
+    if (!tokenAddress) {
+      throw new Error(`USDT not available on ${networkKey} ${isTestnet ? 'testnet' : 'mainnet'}`);
+    }
+    
     const provider = getProvider(networkKey, isTestnet);
     const wallet = new ethers.Wallet(privateKey, provider);
-    
-    const tokenAddress = networkKey === 'ETHEREUM' 
-      ? TOKEN_ADDRESSES.USDT_ETHEREUM 
-      : TOKEN_ADDRESSES.USDT_BSC;
     
     const tokenContract = new ethers.Contract(tokenAddress, ERC20_ABI, wallet);
     

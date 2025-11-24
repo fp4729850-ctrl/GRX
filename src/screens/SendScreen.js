@@ -17,14 +17,22 @@ import {
   estimateGas,
   getGasPrice,
 } from '../services/networkService';
+import { sendCustodialTransaction } from '../services/custodialService';
 import { getWalletAddress } from '../services/storageService';
 import { validateAddress, validateAmount } from '../utils/validation';
 import ConfirmModal from '../components/ConfirmModal';
 import { theme } from '../styles/theme';
 
 const SendScreen = ({ navigation }) => {
-  const { privateKey, currentNetwork, isTestnet, ethBalance, usdtBalance } =
-    useWallet();
+  const {
+    privateKey,
+    walletAddress,
+    currentNetwork,
+    isTestnet,
+    ethBalance,
+    usdtBalance,
+    custodialMode,
+  } = useWallet();
   const [recipient, setRecipient] = useState('');
   const [amount, setAmount] = useState('');
   const [gasLimit, setGasLimit] = useState('');
@@ -36,9 +44,14 @@ const SendScreen = ({ navigation }) => {
 
   useEffect(() => {
     calculateFee();
-  }, [amount, recipient, gasLimit, tokenType]);
+  }, [amount, recipient, gasLimit, tokenType, custodialMode]);
 
   const calculateFee = async () => {
+    if (custodialMode) {
+      setTransactionFee('Managed by GRX');
+      return;
+    }
+
     if (!amount || !recipient || !validateAddress(recipient)) {
       setTransactionFee('0');
       return;
@@ -55,19 +68,27 @@ const SendScreen = ({ navigation }) => {
   };
 
   const handleEstimateGas = async () => {
+    if (custodialMode) {
+      Alert.alert(
+        'Custodial Mode',
+        'Gas estimation is handled by the GRX backend when custodial mode is active.'
+      );
+      return;
+    }
+
     if (!recipient || !amount || !validateAddress(recipient)) {
       Alert.alert('Error', 'Please enter valid recipient and amount');
       return;
     }
 
     try {
-      const walletAddress = await getWalletAddress();
+      const senderAddress = walletAddress || (await getWalletAddress());
       const value = tokenType === 'ETH' 
         ? ethers.parseEther(amount)
         : '0x0';
       
       const gas = await estimateGas(
-        walletAddress,
+        senderAddress,
         recipient,
         value,
         '0x',
@@ -116,6 +137,28 @@ const SendScreen = ({ navigation }) => {
     setShowConfirm(false);
 
     try {
+      if (custodialMode) {
+        const response = await sendCustodialTransaction({
+          from: walletAddress,
+          to: recipient,
+          amount,
+          token: tokenType,
+          network: currentNetwork,
+          isTestnet,
+        });
+        Alert.alert(
+          'Request Submitted',
+          `Custodial transfer queued. Reference: ${response?.reference || response?.id || 'pending'}`,
+          [
+            {
+              text: 'OK',
+              onPress: () => navigation.goBack(),
+            },
+          ]
+        );
+        return;
+      }
+
       let tx;
       if (tokenType === 'ETH') {
         tx = await sendTransaction(
@@ -180,13 +223,29 @@ const SendScreen = ({ navigation }) => {
     to: recipient,
     amount: amount,
     symbol: tokenType,
-    gasLimit: gasLimit || 'Auto',
-    fee: `${transactionFee} ${currentNetwork === 'ETHEREUM' ? 'ETH' : 'BNB'}`,
+    gasLimit: custodialMode ? 'Backend managed' : gasLimit || 'Auto',
+    fee: custodialMode
+      ? 'Handled by GRX operations'
+      : `${transactionFee} ${currentNetwork === 'ETHEREUM' ? 'ETH' : 'BNB'}`,
+    mode: custodialMode ? 'Custodial (backend-managed)' : 'On-chain (self custody)',
   };
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.form}>
+        <View
+          style={[
+            styles.modeBanner,
+            custodialMode ? styles.custodialBanner : styles.onchainBanner,
+          ]}
+        >
+          <Text style={styles.modeBannerText}>
+            {custodialMode
+              ? 'Custodial wallet enabled · Requests are sent to the GRX backend team.'
+              : 'On-chain mode · You will sign this transaction directly with your device.'}
+          </Text>
+        </View>
+
         <View style={styles.inputGroup}>
           <Text style={styles.label}>Token</Text>
           <View style={styles.tokenSelector}>
@@ -253,25 +312,33 @@ const SendScreen = ({ navigation }) => {
           <View style={styles.gasRow}>
             <Text style={styles.label}>Gas Limit (Optional)</Text>
             <TouchableOpacity
-              style={styles.estimateButton}
+              style={[styles.estimateButton, custodialMode && styles.disabledButton]}
               onPress={handleEstimateGas}
+              disabled={custodialMode}
             >
-              <Text style={styles.estimateButtonText}>Estimate</Text>
+              <Text style={styles.estimateButtonText}>
+                {custodialMode ? 'Managed' : 'Estimate'}
+              </Text>
             </TouchableOpacity>
           </View>
           <TextInput
-            style={styles.input}
+            style={[styles.input, custodialMode && styles.inputDisabled]}
             value={gasLimit}
             onChangeText={setGasLimit}
             placeholder="Auto"
             keyboardType="numeric"
+            editable={!custodialMode}
           />
         </View>
 
         <View style={styles.feeContainer}>
-          <Text style={styles.feeLabel}>Network Fee:</Text>
+          <Text style={styles.feeLabel}>
+            {custodialMode ? 'Service Routing:' : 'Network Fee:'}
+          </Text>
           <Text style={styles.feeValue}>
-            {transactionFee} {currentNetwork === 'ETHEREUM' ? 'ETH' : 'BNB'}
+            {custodialMode
+              ? 'Handled by GRX backend'
+              : `${transactionFee} ${currentNetwork === 'ETHEREUM' ? 'ETH' : 'BNB'}`}
           </Text>
         </View>
 
@@ -400,6 +467,31 @@ const styles = StyleSheet.create({
     color: theme.colors.secondary,
     fontSize: 18,
     fontWeight: '600',
+  },
+  modeBanner: {
+    borderRadius: theme.borderRadius.md,
+    padding: theme.spacing.md,
+    marginBottom: theme.spacing.lg,
+  },
+  custodialBanner: {
+    backgroundColor: theme.colors.surfaceAlt,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  onchainBanner: {
+    backgroundColor: theme.colors.surface,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  modeBannerText: {
+    fontSize: 14,
+    color: theme.colors.textSecondary,
+  },
+  disabledButton: {
+    opacity: 0.5,
+  },
+  inputDisabled: {
+    backgroundColor: theme.colors.surfaceAlt,
   },
 });
 

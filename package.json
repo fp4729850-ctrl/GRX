@@ -6,7 +6,8 @@
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "postinstall": "patch-package"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "^2.2.0",
@@ -32,5 +33,14 @@
     "react-native-svg": "15.12.1",
     "react-native-web": "^0.21.2"
   },
-  "private": true
+  "overrides": {
+    "@noble/hashes": "1.8.0",
+    "react-native-renderer": "19.2.0"
+  },
+  "private": true,
+  "devDependencies": {
+    "@types/react": "~19.1.10",
+    "patch-package": "^8.0.1",
+    "typescript": "~5.9.2"
+  }
 }

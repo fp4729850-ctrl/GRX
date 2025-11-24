@@ -6,6 +6,8 @@ import {
   getPrivateKey,
   storeCurrentNetwork,
   setIsTestnet as storeIsTestnet,
+  getCustodialMode,
+  setCustodialMode as storeCustodialMode,
 } from '../services/storageService';
 import { getBalance, getTokenBalance } from '../services/networkService';
 import { fetchTokenPrices } from '../services/priceService';
@@ -33,6 +35,7 @@ export const WalletProvider = ({ children }) => {
   const [prices, setPrices] = useState({ eth: 0, usdt: 1 });
   const [loading, setLoading] = useState(false);
   const [isWalletInitialized, setIsWalletInitialized] = useState(false);
+  const [custodialMode, setCustodialModeState] = useState(false);
 
   // Load wallet data on mount
   useEffect(() => {
@@ -52,6 +55,7 @@ export const WalletProvider = ({ children }) => {
       const address = await getWalletAddress();
       const network = await getCurrentNetwork();
       const testnet = await getIsTestnet();
+      const custodial = await getCustodialMode();
       const pk = await getPrivateKey();
 
       if (address) {
@@ -60,6 +64,7 @@ export const WalletProvider = ({ children }) => {
         setIsTestnet(testnet || false);
         setPrivateKey(pk);
         setIsWalletInitialized(true);
+        setCustodialModeState(!!custodial);
       }
     } catch (error) {
       console.error('Error loading wallet data:', error);
@@ -121,6 +126,11 @@ export const WalletProvider = ({ children }) => {
     await refreshBalances();
   };
 
+  const updateCustodialMode = async (enabled) => {
+    await storeCustodialMode(enabled);
+    setCustodialModeState(enabled);
+  };
+
   const initializeWallet = (address, pk) => {
     setWalletAddress(address);
     setPrivateKey(pk);
@@ -152,6 +162,8 @@ export const WalletProvider = ({ children }) => {
     refreshBalances,
     refreshPrices,
     updateNetwork,
+    custodialMode,
+    updateCustodialMode,
     initializeWallet,
     clearWallet,
   };

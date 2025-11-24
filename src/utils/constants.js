@@ -43,14 +43,54 @@ export const STORAGE_KEYS = {
   BIOMETRIC_ENABLED: 'biometricEnabled',
   CURRENT_NETWORK: 'currentNetwork',
   IS_TESTNET: 'isTestnet',
+  CUSTODIAL_MODE: 'custodialMode',
+  INVOICES: 'grxInvoices',
 };
 
 // Token addresses
 export const TOKEN_ADDRESSES = {
+  // Mainnet
   USDT_ETHEREUM: '0xdAC17F958D2ee523a2206206994597C13D831ec7',
   USDT_BSC: '0x55d398326f99059fF775485246999027B3197955',
+  // Testnet (if available, otherwise will return zero balance)
+  USDT_ETHEREUM_TESTNET: null, // USDT not typically available on Sepolia
+  USDT_BSC_TESTNET: '0x337610d27c682E347C9cD60BD4b3b107C9d34dDd', // BSC Testnet USDT
+};
+
+export const GRX_TOKEN_ADDRESSES = {
+  ETHEREUM: {
+    mainnet: '0x0000000000000000000000000000000000000000', // TODO: replace with live GRX mainnet contract
+    testnet: '0x0000000000000000000000000000000000000000', // TODO: replace with GRX testnet contract
+  },
+  BSC: {
+    mainnet: '0x0000000000000000000000000000000000000000',
+    testnet: '0x0000000000000000000000000000000000000000',
+  },
+};
+
+export const GRX_TOKEN_METADATA = {
+  symbol: 'GRX',
+  name: 'GRX Token',
+  decimals: 18,
 };
 
 // CoinGecko API
 export const COINGECKO_API = 'https://api.coingecko.com/api/v3/simple/price';
+
+export const ORACLE_API_URL =
+  (typeof process !== 'undefined' && process.env?.EXPO_PUBLIC_ORACLE_API) ||
+  null;
+
+export const API_BASE_URL =
+  (typeof process !== 'undefined' && process.env?.EXPO_PUBLIC_API_BASE_URL) ||
+  null;
+
+// Oracle snapshot configuration
+export const ORACLE_SNAPSHOT_CONFIG = {
+  allowedWindowMinutes:
+    (typeof process !== 'undefined' &&
+      parseInt(process.env?.EXPO_PUBLIC_ORACLE_WINDOW_MINUTES)) ||
+    10,
+  pollIntervalMs: 30000, // 30 seconds
+};
 

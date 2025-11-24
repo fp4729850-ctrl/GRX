@@ -3,8 +3,10 @@ import { AppState, Platform } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { Ionicons } from '@expo/vector-icons';
 import { WalletProvider, useWallet } from './src/context/WalletContext';
 import { getWalletAddress, getAppLocked, setAppLocked } from './src/services/storageService';
+import { theme } from './src/styles/theme';
 
 // Polyfill Buffer for web
 if (Platform.OS === 'web') {
@@ -25,39 +27,75 @@ import DashboardScreen from './src/screens/DashboardScreen';
 import SendScreen from './src/screens/SendScreen';
 import ReceiveScreen from './src/screens/ReceiveScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
+import RedeemScreen from './src/screens/RedeemScreen';
+import InvoicesScreen from './src/screens/InvoicesScreen';
+import InvoiceDetailScreen from './src/screens/InvoiceDetailScreen';
+import MintScreen from './src/screens/MintScreen';
+import VaultScreen from './src/screens/VaultScreen';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
 
 // Main app tabs (shown after wallet is set up)
+const iconMap = {
+  Dashboard: { focused: 'wallet', default: 'wallet-outline', label: 'Wallet' },
+  Receive: { focused: 'download', default: 'download-outline', label: 'Receive' },
+  Settings: { focused: 'settings', default: 'settings-outline', label: 'Settings' },
+};
+
 const MainTabs = () => {
   return (
     <Tab.Navigator
-      screenOptions={{
+      screenOptions={({ route }) => ({
         headerShown: false,
-        tabBarActiveTintColor: '#2196F3',
-        tabBarInactiveTintColor: '#757575',
-        tabBarStyle: {
-          backgroundColor: '#FFFFFF',
-          borderTopWidth: 1,
-          borderTopColor: '#E0E0E0',
+        tabBarHideOnKeyboard: true,
+        tabBarActiveTintColor: theme.colors.primary,
+        tabBarInactiveTintColor: theme.colors.textSecondary,
+        tabBarLabelStyle: {
+          fontSize: 12,
+          fontWeight: '600',
+          marginTop: 4,
         },
-      }}
+        tabBarItemStyle: {
+          borderRadius: 16,
+          marginHorizontal: 6,
+          paddingVertical: 4,
+        },
+        tabBarStyle: {
+          backgroundColor: theme.colors.surface,
+          borderTopWidth: 0,
+          marginHorizontal: 16,
+          marginBottom: 16,
+          borderRadius: 24,
+          height: 70,
+          paddingBottom: 10,
+          paddingTop: 10,
+          shadowColor: '#000',
+          shadowOpacity: 0.2,
+          shadowRadius: 12,
+          elevation: 12,
+        },
+        tabBarIcon: ({ color, focused }) => {
+          const icons = iconMap[route.name];
+          const iconName = focused ? icons?.focused : icons?.default;
+          return <Ionicons name={iconName || 'ellipse'} size={22} color={color} />;
+        },
+      })}
     >
       <Tab.Screen 
         name="Dashboard" 
         component={DashboardScreen}
-        options={{ title: 'Wallet' }}
+        options={{ title: iconMap.Dashboard.label }}
       />
       <Tab.Screen 
         name="Receive" 
         component={ReceiveScreen}
-        options={{ title: 'Receive' }}
+        options={{ title: iconMap.Receive.label }}
       />
       <Tab.Screen 
         name="Settings" 
         component={SettingsScreen}
-        options={{ title: 'Settings' }}
+        options={{ title: iconMap.Settings.label }}
       />
     </Tab.Navigator>
   );
@@ -71,7 +109,7 @@ const RootNavigator = () => {
 
   useEffect(() => {
     checkWalletStatus();
-    setupAppLock();
+    return setupAppLock();
   }, []);
 
   const checkWalletStatus = async () => {
@@ -172,6 +210,31 @@ const RootNavigator = () => {
               name="Send" 
               component={SendScreen}
               options={{ title: 'Send' }}
+            />
+            <Stack.Screen 
+              name="Mint" 
+              component={MintScreen}
+              options={{ title: 'Mint' }}
+            />
+            <Stack.Screen 
+              name="Vault" 
+              component={VaultScreen}
+              options={{ title: 'Vault' }}
+            />
+            <Stack.Screen 
+              name="Redeem" 
+              component={RedeemScreen}
+              options={{ title: 'Redeem / Burn' }}
+            />
+            <Stack.Screen 
+              name="Invoices" 
+              component={InvoicesScreen}
+              options={{ title: 'Invoices' }}
+            />
+            <Stack.Screen 
+              name="InvoiceDetail" 
+              component={InvoiceDetailScreen}
+              options={{ title: 'Invoice Details' }}
             />
           </>
         )}

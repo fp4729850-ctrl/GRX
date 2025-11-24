@@ -22,6 +22,8 @@ const ConfirmModal = ({
   onConfirm,
   transactionDetails,
   loading,
+  snapshotCard,
+  children,
 }) => {
   const [pin, setPin] = useState('');
   const [verifying, setVerifying] = useState(false);
@@ -102,6 +104,14 @@ const ConfirmModal = ({
                 {transactionDetails?.amount} {transactionDetails?.symbol}
               </Text>
             </View>
+            {transactionDetails?.mode && (
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Execution:</Text>
+                <Text style={styles.detailValue}>
+                  {transactionDetails.mode}
+                </Text>
+              </View>
+            )}
             <View style={styles.detailRow}>
               <Text style={styles.detailLabel}>Gas Limit:</Text>
               <Text style={styles.detailValue}>
@@ -115,6 +125,12 @@ const ConfirmModal = ({
               </Text>
             </View>
           </View>
+
+          {snapshotCard && (
+            <View style={styles.snapshotContainer}>{snapshotCard}</View>
+          )}
+
+          {children && <View style={styles.childrenContainer}>{children}</View>}
 
           <View style={styles.authContainer}>
             <TouchableOpacity
@@ -257,6 +273,12 @@ const styles = StyleSheet.create({
   cancelButtonText: {
     color: theme.colors.textSecondary,
     fontSize: 16,
+  },
+  snapshotContainer: {
+    marginBottom: theme.spacing.md,
+  },
+  childrenContainer: {
+    marginBottom: theme.spacing.md,
   },
 });
 

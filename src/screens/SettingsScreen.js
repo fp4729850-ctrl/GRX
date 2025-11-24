@@ -25,7 +25,14 @@ import { theme } from '../styles/theme';
 const isWeb = Platform.OS === 'web';
 
 const SettingsScreen = ({ navigation }) => {
-  const { isTestnet, currentNetwork, updateNetwork, clearWallet } = useWallet();
+  const {
+    isTestnet,
+    currentNetwork,
+    updateNetwork,
+    clearWallet,
+    custodialMode,
+    updateCustodialMode,
+  } = useWallet();
   const [biometricEnabled, setBiometricEnabledState] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -136,6 +143,26 @@ const SettingsScreen = ({ navigation }) => {
     await updateNetwork(currentNetwork, value);
   };
 
+  const handleToggleCustodial = async (value) => {
+    if (value) {
+      Alert.alert(
+        'Enable Custodial Mode',
+        'Your transactions will be routed through the GRX backend. Admins will execute burn actions on your behalf.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Enable',
+            onPress: async () => {
+              await updateCustodialMode(true);
+            },
+          },
+        ]
+      );
+    } else {
+      await updateCustodialMode(false);
+    }
+  };
+
   const handleClearData = () => {
     Alert.alert(
       'Clear All Data',
@@ -181,6 +208,25 @@ const SettingsScreen = ({ navigation }) => {
           <Switch
             value={isTestnet}
             onValueChange={handleToggleTestnet}
+            trackColor={{ false: '#ccc', true: theme.colors.primary }}
+          />
+        </View>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Wallet Mode</Text>
+        <View style={styles.settingRow}>
+          <View style={styles.settingColumn}>
+            <Text style={styles.settingLabel}>Use Custodial Wallet</Text>
+            <Text style={styles.settingDescription}>
+              {custodialMode
+                ? 'Transactions handled by backend administrators.'
+                : 'Send directly on-chain from your device.'}
+            </Text>
+          </View>
+          <Switch
+            value={custodialMode}
+            onValueChange={handleToggleCustodial}
             trackColor={{ false: '#ccc', true: theme.colors.primary }}
           />
         </View>
@@ -260,6 +306,15 @@ const styles = StyleSheet.create({
   settingLabel: {
     fontSize: 16,
     color: theme.colors.text,
+  },
+  settingColumn: {
+    flex: 1,
+    marginRight: theme.spacing.sm,
+  },
+  settingDescription: {
+    fontSize: 12,
+    color: theme.colors.textSecondary,
+    marginTop: 4,
   },
   settingValue: {
     fontSize: 18,

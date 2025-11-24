@@ -213,6 +213,40 @@ export const getBiometricEnabled = async () => {
 };
 
 /**
+ * Store custodial mode preference
+ */
+export const setCustodialMode = async (enabled) => {
+  try {
+    if (isWeb) {
+      await AsyncStorage.setItem(STORAGE_KEYS.CUSTODIAL_MODE, enabled.toString());
+    } else {
+      await SecureStore.setItemAsync(STORAGE_KEYS.CUSTODIAL_MODE, enabled.toString());
+    }
+    return true;
+  } catch (error) {
+    console.error('Error storing custodial mode:', error);
+    return false;
+  }
+};
+
+/**
+ * Get custodial mode preference
+ */
+export const getCustodialMode = async () => {
+  try {
+    if (isWeb) {
+      const enabled = await AsyncStorage.getItem(STORAGE_KEYS.CUSTODIAL_MODE);
+      return enabled === 'true';
+    } else {
+      const enabled = await SecureStore.getItemAsync(STORAGE_KEYS.CUSTODIAL_MODE);
+      return enabled === 'true';
+    }
+  } catch (error) {
+    return false;
+  }
+};
+
+/**
  * Store current network
  */
 export const storeCurrentNetwork = async (network) => {
@@ -293,6 +327,7 @@ export const clearAllData = async () => {
         STORAGE_KEYS.BIOMETRIC_ENABLED,
         STORAGE_KEYS.CURRENT_NETWORK,
         STORAGE_KEYS.IS_TESTNET,
+        STORAGE_KEYS.CUSTODIAL_MODE,
       ]);
     } else {
       await Keychain.resetGenericPassword({ service: 'grx_wallet_mnemonic' });
@@ -303,6 +338,7 @@ export const clearAllData = async () => {
       await SecureStore.deleteItemAsync(STORAGE_KEYS.BIOMETRIC_ENABLED);
       await SecureStore.deleteItemAsync(STORAGE_KEYS.CURRENT_NETWORK);
       await SecureStore.deleteItemAsync(STORAGE_KEYS.IS_TESTNET);
+      await SecureStore.deleteItemAsync(STORAGE_KEYS.CUSTODIAL_MODE);
     }
     return true;
   } catch (error) {

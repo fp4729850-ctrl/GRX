@@ -10,17 +10,21 @@ const BalanceCard = ({ symbol, balance, usdBalance, icon }) => {
         {icon && <Text style={styles.icon}>{icon}</Text>}
       </View>
       <Text style={styles.balance}>{balance}</Text>
-      <Text style={styles.usdBalance}>${usdBalance} USD</Text>
+      <Text style={styles.usdBalance}>
+        {usdBalance === "—" ? "—" : `$${usdBalance} USD`}
+      </Text>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: theme.colors.surface,
+    backgroundColor: theme.colors.surfaceAlt,
     padding: theme.spacing.lg,
     borderRadius: theme.borderRadius.lg,
     marginBottom: theme.spacing.md,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
     ...theme.shadows.medium,
   },
   header: {
@@ -30,12 +34,15 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.sm,
   },
   symbol: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: theme.colors.text,
+    fontSize: 16,
+    fontWeight: '700',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+    color: theme.colors.textSecondary,
   },
   icon: {
     fontSize: 24,
+    opacity: 0.8,
   },
   balance: {
     fontSize: 32,
