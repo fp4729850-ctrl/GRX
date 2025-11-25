@@ -4,6 +4,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { WalletProvider, useWallet } from './src/context/WalletContext';
 import { getWalletAddress, getAppLocked, setAppLocked } from './src/services/storageService';
 import { theme } from './src/styles/theme';
@@ -48,7 +49,7 @@ const MainTabs = () => {
     <Tab.Navigator
       screenOptions={({ route }) => ({
         headerShown: false,
-        tabBarHideOnKeyboard: true,
+        tabBarHideOnKeyboard: !isWeb,
         tabBarActiveTintColor: theme.colors.primary,
         tabBarInactiveTintColor: theme.colors.textSecondary,
         tabBarLabelStyle: {
@@ -245,8 +246,10 @@ const RootNavigator = () => {
 
 export default function App() {
   return (
-    <WalletProvider>
-      <RootNavigator />
-    </WalletProvider>
+    <SafeAreaProvider>
+      <WalletProvider>
+        <RootNavigator />
+      </WalletProvider>
+    </SafeAreaProvider>
   );
 }

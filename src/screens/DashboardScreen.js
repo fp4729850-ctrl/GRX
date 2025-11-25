@@ -10,6 +10,7 @@ import {
   Alert,
   Animated,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useWallet } from "../context/WalletContext";
 import { useGRXBalance } from "../hooks/useGRXBalance";
 import BalanceCard from "../components/BalanceCard";
@@ -117,13 +118,17 @@ const DashboardScreen = ({ navigation }) => {
   };
 
   return (
-    <ScrollView
-      style={styles.container}
-      refreshControl={
-        <RefreshControl refreshing={loading} onRefresh={handleRefresh} />
-      }
-    >
-      <View style={styles.content}>
+    <SafeAreaView style={styles.safeArea}>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={
+          <RefreshControl refreshing={loading} onRefresh={handleRefresh} />
+        }
+        showsVerticalScrollIndicator
+        keyboardShouldPersistTaps="handled"
+      >
+        <View style={styles.content}>
         {/* Top Bar */}
         <View style={styles.topBar}>
           <View style={styles.networkSelector}>
@@ -414,15 +419,23 @@ const DashboardScreen = ({ navigation }) => {
           <Text style={styles.sectionTitle}>Recent Transactions</Text>
           <Text style={styles.emptyText}>No transactions yet</Text>
         </View>
-      </View>
-    </ScrollView>
+        </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: theme.colors.background,
+  },
   container: {
     flex: 1,
     backgroundColor: theme.colors.background,
+  },
+  scrollContent: {
+    paddingBottom: theme.spacing.xl * 2,
   },
   content: {
     padding: theme.spacing.lg,

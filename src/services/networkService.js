@@ -1,5 +1,5 @@
 import { ethers } from 'ethers';
-import { NETWORKS, TOKEN_ADDRESSES } from '../utils/constants';
+import { NETWORKS, TOKEN_ADDRESSES, GRX_TOKEN_ADDRESSES, GRX_TOKEN_METADATA } from '../utils/constants';
 
 // ERC20 ABI for balance checking
 const ERC20_ABI = [
@@ -212,6 +212,50 @@ export const sendTokenTransaction = async (
     return tx;
   } catch (error) {
     console.error('Error sending token transaction:', error);
+    throw error;
+  }
+};
+
+/**
+ * Send GRX token transaction
+ */
+export const sendGRXTransaction = async (
+  privateKey,
+  to,
+  amount,
+  gasLimit,
+  networkKey,
+  isTestnet = false
+) => {
+  try {
+    // Get the correct GRX token address based on network
+    const normalized = networkKey?.toUpperCase() === 'BSC' ? 'BSC' : 'ETHEREUM';
+    const bucket = GRX_TOKEN_ADDRESSES[normalized];
+    
+    if (!bucket) {
+      throw new Error(`GRX not available on ${networkKey}`);
+    }
+    
+    const tokenAddress = isTestnet ? bucket.testnet : bucket.mainnet;
+    
+    if (!tokenAddress || tokenAddress === ethers.ZeroAddress) {
+      throw new Error(`GRX contract address not configured for ${networkKey} ${isTestnet ? 'testnet' : 'mainnet'}`);
+    }
+    
+    const provider = getProvider(networkKey, isTestnet);
+    const wallet = new ethers.Wallet(privateKey, provider);
+    
+    const tokenContract = new ethers.Contract(tokenAddress, ERC20_ABI, wallet);
+    
+    const amountWei = ethers.parseUnits(amount.toString(), GRX_TOKEN_METADATA.decimals);
+    
+    const tx = await tokenContract.transfer(to, amountWei, {
+      gasLimit: gasLimit || undefined,
+    });
+    
+    return tx;
+  } catch (error) {
+    console.error('Error sending GRX transaction:', error);
     throw error;
   }
 };

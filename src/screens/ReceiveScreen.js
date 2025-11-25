@@ -6,7 +6,9 @@ import {
   TouchableOpacity,
   Clipboard,
   Alert,
+  ScrollView,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import QRCode from 'react-native-qrcode-svg';
 import { useWallet } from '../context/WalletContext';
 import { theme } from '../styles/theme';
@@ -20,8 +22,12 @@ const ReceiveScreen = () => {
   };
 
   return (
-    <View style={styles.container}>
-      <View style={styles.content}>
+    <SafeAreaView style={styles.safeArea}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator
+        keyboardShouldPersistTaps="handled"
+      >
         <Text style={styles.title}>Receive</Text>
         <Text style={styles.description}>
           Share this address to receive {walletAddress ? 'tokens' : ''}
@@ -60,15 +66,18 @@ const ReceiveScreen = () => {
             </View>
           </>
         )}
-      </View>
-    </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
+  safeArea: {
     flex: 1,
     backgroundColor: theme.colors.background,
+  },
+  container: {
+    flex: 1,
   },
   content: {
     flex: 1,

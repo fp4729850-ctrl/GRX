@@ -1,19 +1,30 @@
 import React from "react";
-import { View, Text, StyleSheet } from "react-native";
+import { View, Text, StyleSheet, ScrollView } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { theme } from "../styles/theme";
 
 const MintScreen = () => {
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Mint GRX</Text>
-      <Text style={styles.subtitle}>
-        Minting will be available soon. Stay tuned!
-      </Text>
-    </View>
+    <SafeAreaView style={styles.safeArea}>
+      <ScrollView
+        contentContainerStyle={styles.container}
+        showsVerticalScrollIndicator
+        keyboardShouldPersistTaps="handled"
+      >
+        <Text style={styles.title}>Mint GRX</Text>
+        <Text style={styles.subtitle}>
+          Minting will be available soon. Stay tuned!
+        </Text>
+      </ScrollView>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: theme.colors.background,
+  },
   container: {
     flex: 1,
     backgroundColor: theme.colors.background,

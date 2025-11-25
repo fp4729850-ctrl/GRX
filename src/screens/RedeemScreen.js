@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   Alert,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { ethers } from "ethers";
 import { useWallet } from "../context/WalletContext";
 import { useGRXBalance } from "../hooks/useGRXBalance";
@@ -310,7 +311,13 @@ const RedeemScreen = ({ navigation }) => {
 
   if (successData) {
     return (
-      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      <SafeAreaView style={styles.safeArea}>
+        <ScrollView
+          style={styles.container}
+          contentContainerStyle={styles.content}
+          showsVerticalScrollIndicator
+          keyboardShouldPersistTaps="handled"
+        >
         <View style={styles.successCard}>
           <Text style={styles.successEmoji}>✅</Text>
           <Text style={styles.successTitle}>
@@ -357,12 +364,19 @@ const RedeemScreen = ({ navigation }) => {
             <Text style={styles.secondaryButtonText}>New Redeem</Text>
           </TouchableOpacity>
         </View>
-      </ScrollView>
+        </ScrollView>
+      </SafeAreaView>
     );
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <SafeAreaView style={styles.safeArea}>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator
+        keyboardShouldPersistTaps="handled"
+      >
       <View
         style={[
           styles.modeBanner,
@@ -374,9 +388,7 @@ const RedeemScreen = ({ navigation }) => {
             ? "Custodial wallet enabled · GRX operators will execute admin burnWithInvoice."
             : "You will submit an on-chain burnWithInvoice transaction from this device."}
         </Text>
-        <Text style={styles.snapshotText}>
-          Using latest oracle snapshot for settlement quotes.
-        </Text>
+        <Text style={styles.snapshotText}>Using snapshot for settlement.</Text>
       </View>
 
       <View style={styles.card}>
@@ -466,11 +478,16 @@ const RedeemScreen = ({ navigation }) => {
           ) : null
         }
       />
-    </ScrollView>
+      </ScrollView>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: theme.colors.background,
+  },
   container: {
     flex: 1,
     backgroundColor: theme.colors.background,
