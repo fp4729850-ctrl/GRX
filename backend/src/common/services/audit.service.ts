@@ -22,7 +22,7 @@ export class AuditService {
    */
   async logAction(data: AuditLogData): Promise<void> {
     try {
-      await this.prisma.auditLog.create({
+      await this.prisma.audit_logs.create({
         data: {
           userId: data.userId,
           action: data.action,
@@ -31,7 +31,7 @@ export class AuditService {
           details: data.details ? JSON.stringify(data.details) : null,
           ipAddress: data.ipAddress,
           userAgent: data.userAgent,
-        },
+        } as any,
       });
     } catch (error) {
       this.logger.error('Failed to create audit log', error);
@@ -81,13 +81,13 @@ export class AuditService {
     }
 
     const [logs, total] = await Promise.all([
-      this.prisma.auditLog.findMany({
+      this.prisma.audit_logs.findMany({
         where,
         skip,
         take: limit,
         orderBy: { createdAt: 'desc' },
         include: {
-          user: {
+          users: {
             select: {
               id: true,
               email: true,
@@ -96,7 +96,7 @@ export class AuditService {
           },
         },
       }),
-      this.prisma.auditLog.count({ where }),
+      this.prisma.audit_logs.count({ where }),
     ]);
 
     return {

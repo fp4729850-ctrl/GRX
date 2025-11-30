@@ -1,11 +1,11 @@
 import { IsEnum, IsNotEmpty } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
-import { KycStatus } from '@prisma/client';
+import { users_kycStatus } from '@prisma/client';
 
 export class UpdateKycStatusDto {
-  @ApiProperty({ description: 'KYC status', enum: KycStatus })
+  @ApiProperty({ description: 'KYC status', enum: users_kycStatus })
   @IsNotEmpty()
-  @IsEnum(KycStatus)
-  status: KycStatus;
+  @IsEnum(users_kycStatus)
+  status: users_kycStatus;
 }
 

@@ -48,7 +48,7 @@ export class PartnersService {
       const apiKeyHash = this.encryptionService.hash(dto.apiKey);
 
       // Check if API key already exists
-      const existing = await this.prisma.partner.findUnique({
+      const existing = await this.prisma.partners.findUnique({
         where: { apiKey: dto.apiKey },
       });
 
@@ -57,7 +57,7 @@ export class PartnersService {
       }
 
       // Create partner
-      const partner = await this.prisma.partner.create({
+      const partner = await this.prisma.partners.create({
         data: {
           name: dto.name,
           apiKey: dto.apiKey,
@@ -93,7 +93,7 @@ export class PartnersService {
    */
   async authenticatePartner(apiKey: string, ipAddress?: string) {
     try {
-      const partner = await this.prisma.partner.findUnique({
+      const partner = await this.prisma.partners.findUnique({
         where: { apiKey },
       });
 
@@ -142,7 +142,7 @@ export class PartnersService {
    */
   async sendWebhook(partnerId: string, event: string, data: any) {
     try {
-      const partner = await this.prisma.partner.findUnique({
+      const partner = await this.prisma.partners.findUnique({
         where: { id: partnerId },
       });
 
@@ -176,7 +176,7 @@ export class PartnersService {
    * Get partner by ID
    */
   async getPartner(partnerId: string) {
-    const partner = await this.prisma.partner.findUnique({
+    const partner = await this.prisma.partners.findUnique({
       where: { id: partnerId },
     });
 
@@ -200,12 +200,12 @@ export class PartnersService {
    */
   async getPartners(limit: number = 50, offset: number = 0) {
     const [partners, total] = await Promise.all([
-      this.prisma.partner.findMany({
+      this.prisma.partners.findMany({
         orderBy: { createdAt: 'desc' },
         take: limit,
         skip: offset,
       }),
-      this.prisma.partner.count(),
+      this.prisma.partners.count(),
     ]);
 
     return {

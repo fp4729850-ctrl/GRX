@@ -56,7 +56,7 @@ export class WalletsService {
       }
 
       // Check if wallet address already exists
-      const existingWallet = await this.prisma.wallet.findUnique({
+      const existingWallet = await this.prisma.wallets.findUnique({
         where: { address },
       });
 
@@ -65,7 +65,7 @@ export class WalletsService {
       }
 
       // Create wallet in database
-      const dbWallet = await this.prisma.wallet.create({
+      const dbWallet = await this.prisma.wallets.create({
         data: {
           userId,
           address,
@@ -147,7 +147,7 @@ export class WalletsService {
       }
 
       // Check if wallet already exists
-      const existingWallet = await this.prisma.wallet.findUnique({
+      const existingWallet = await this.prisma.wallets.findUnique({
         where: { address },
       });
 
@@ -169,7 +169,7 @@ export class WalletsService {
       }
 
       // Create wallet in database
-      const dbWallet = await this.prisma.wallet.create({
+      const dbWallet = await this.prisma.wallets.create({
         data: {
           userId,
           address,
@@ -203,7 +203,7 @@ export class WalletsService {
    * Get wallet by address
    */
   async getWalletByAddress(address: string, userId?: string) {
-    const wallet = await this.prisma.wallet.findUnique({
+    const wallet = await this.prisma.wallets.findUnique({
       where: { address },
     });
 
@@ -231,7 +231,7 @@ export class WalletsService {
    * Get all wallets for a user
    */
   async getWalletsByUserId(userId: string) {
-    const wallets = await this.prisma.wallet.findMany({
+    const wallets = await this.prisma.wallets.findMany({
       where: { userId },
       orderBy: { createdAt: 'desc' },
     });
@@ -308,7 +308,7 @@ export class WalletsService {
     password: string,
     userId: string,
   ): Promise<{ privateKey: string }> {
-    const wallet = await this.prisma.wallet.findUnique({
+    const wallet = await this.prisma.wallets.findUnique({
       where: { address },
     });
 
@@ -345,7 +345,7 @@ export class WalletsService {
    * Delete wallet
    */
   async deleteWallet(address: string, userId: string) {
-    const wallet = await this.prisma.wallet.findUnique({
+    const wallet = await this.prisma.wallets.findUnique({
       where: { address },
     });
 
@@ -357,7 +357,7 @@ export class WalletsService {
       throw new NotFoundException('Wallet not found');
     }
 
-    await this.prisma.wallet.delete({
+    await this.prisma.wallets.delete({
       where: { address },
     });
 

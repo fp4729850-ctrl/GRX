@@ -201,7 +201,7 @@ export class OraclesService {
       const signature = this.encryptionService.hash(snapshotData);
 
       // Create snapshot
-      const snapshot = await this.prisma.oracleSnapshot.create({
+      const snapshot = await this.prisma.oracle_snapshots.create({
         data: {
           timestamp: new Date(),
           blockNumber: blockNumber || (dto.blockNumber ? BigInt(dto.blockNumber) : null),
@@ -266,7 +266,7 @@ export class OraclesService {
    * Get latest snapshot
    */
   async getLatestSnapshot() {
-    const snapshot = await this.prisma.oracleSnapshot.findFirst({
+    const snapshot = await this.prisma.oracle_snapshots.findFirst({
       orderBy: { timestamp: 'desc' },
     });
 
@@ -291,12 +291,12 @@ export class OraclesService {
    */
   async getSnapshots(limit: number = 50, offset: number = 0) {
     const [snapshots, total] = await Promise.all([
-      this.prisma.oracleSnapshot.findMany({
+      this.prisma.oracle_snapshots.findMany({
         orderBy: { timestamp: 'desc' },
         take: limit,
         skip: offset,
       }),
-      this.prisma.oracleSnapshot.count(),
+      this.prisma.oracle_snapshots.count(),
     ]);
 
     return {

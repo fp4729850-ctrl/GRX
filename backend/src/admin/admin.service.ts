@@ -25,12 +25,12 @@ export class AdminService {
       totalPartners,
       latestSnapshot,
     ] = await Promise.all([
-      this.prisma.user.count(),
-      this.prisma.wallet.count(),
-      this.prisma.invoice.count(),
-      this.prisma.settlement.count(),
-      this.prisma.certificate.count(),
-      this.prisma.partner.count(),
+      this.prisma.users.count(),
+      this.prisma.wallets.count(),
+      this.prisma.invoices.count(),
+      this.prisma.settlements.count(),
+      this.prisma.certificates.count(),
+      this.prisma.partners.count(),
       this.oraclesService.getLatestSnapshot(),
     ]);
 
@@ -61,12 +61,12 @@ export class AdminService {
    */
   async getUserStats() {
     const [total, byRole, byKycStatus] = await Promise.all([
-      this.prisma.user.count(),
-      this.prisma.user.groupBy({
+      this.prisma.users.count(),
+      this.prisma.users.groupBy({
         by: ['role'],
         _count: true,
       }),
-      this.prisma.user.groupBy({
+      this.prisma.users.groupBy({
         by: ['kycStatus'],
         _count: true,
       }),
@@ -90,11 +90,11 @@ export class AdminService {
    */
   async getTransactionMonitoring(limit: number = 50) {
     const [invoices, settlements, certificates] = await Promise.all([
-      this.prisma.invoice.findMany({
+      this.prisma.invoices.findMany({
         orderBy: { createdAt: 'desc' },
         take: limit,
         include: {
-          user: {
+          users: {
             select: {
               id: true,
               email: true,
@@ -102,11 +102,11 @@ export class AdminService {
           },
         },
       }),
-      this.prisma.settlement.findMany({
+      this.prisma.settlements.findMany({
         orderBy: { createdAt: 'desc' },
         take: limit,
       }),
-      this.prisma.certificate.findMany({
+      this.prisma.certificates.findMany({
         orderBy: { createdAt: 'desc' },
         take: limit,
       }),
@@ -118,7 +118,7 @@ export class AdminService {
         invoiceId: inv.invoiceId,
         amount: inv.amount.toString(),
         status: inv.status,
-        user: inv.user.email,
+        user: inv.users.email,
         createdAt: inv.createdAt,
       })),
       recentSettlements: settlements.map((s) => ({
@@ -144,12 +144,12 @@ export class AdminService {
    */
   async getSystemLogs(limit: number = 100, offset: number = 0) {
     const [logs, total] = await Promise.all([
-      this.prisma.auditLog.findMany({
+      this.prisma.audit_logs.findMany({
         orderBy: { createdAt: 'desc' },
         take: limit,
         skip: offset,
         include: {
-          user: {
+          users: {
             select: {
               id: true,
               email: true,
@@ -158,7 +158,7 @@ export class AdminService {
           },
         },
       }),
-      this.prisma.auditLog.count(),
+      this.prisma.audit_logs.count(),
     ]);
 
     return {
@@ -167,9 +167,9 @@ export class AdminService {
         action: log.action,
         resourceType: log.resourceType,
         resourceId: log.resourceId,
-        user: log.user ? {
-          email: log.user.email,
-          role: log.user.role,
+        user: log.users ? {
+          email: log.users.email,
+          role: log.users.role,
         } : null,
         details: log.details ? JSON.parse(log.details) : null,
         ipAddress: log.ipAddress,
@@ -208,7 +208,7 @@ export class AdminService {
       totalGRXMinted: '0',
       totalGRXBurned: '0',
       totalVolumeUSD: '0',
-      activeUsers: await this.prisma.user.count({
+      activeUsers: await this.prisma.users.count({
         where: {
           createdAt: {
             gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), // Last 30 days

@@ -8,7 +8,7 @@ async function main() {
 
   // Create admin user
   const adminPassword = await bcrypt.hash('admin123', 10);
-  const admin = await prisma.user.upsert({
+  const admin = await prisma.users.upsert({
     where: { email: 'admin@bricspay.com' },
     update: {},
     create: {
@@ -28,7 +28,7 @@ async function main() {
   const crypto = require('crypto');
   const apiKeyHash = crypto.createHash('sha256').update(partnerApiKey).digest('hex');
   
-  const partner = await prisma.partner.upsert({
+  const partner = await prisma.partners.upsert({
     where: { apiKey: partnerApiKey },
     update: {},
     create: {
@@ -62,7 +62,7 @@ async function main() {
 
   for (const userData of testUsers) {
     const password = await bcrypt.hash('test123', 10);
-    const user = await prisma.user.upsert({
+    const user = await prisma.users.upsert({
       where: { email: userData.email },
       update: {},
       create: {

@@ -335,7 +335,7 @@ export class TokensService {
       const amountWei = ethers.parseUnits(dto.amount, GRX_DECIMALS);
 
       // Create proposal in database
-      const proposal = await this.prisma.mintProposal.create({
+      const proposal = await this.prisma.mint_proposals.create({
         data: {
           proposalId,
           userId,
@@ -375,7 +375,7 @@ export class TokensService {
   ) {
     try {
       // Get proposal
-      const proposal = await this.prisma.mintProposal.findUnique({
+      const proposal = await this.prisma.mint_proposals.findUnique({
         where: { proposalId: dto.proposalId },
       });
 
@@ -406,7 +406,7 @@ export class TokensService {
       });
 
       // Update proposal
-      const updatedProposal = await this.prisma.mintProposal.update({
+      const updatedProposal = await this.prisma.mint_proposals.update({
         where: { proposalId: dto.proposalId },
         data: {
           signatures: JSON.stringify(signatures),
@@ -441,7 +441,7 @@ export class TokensService {
   async executeMintProposal(proposalId: string, minterWalletAddress?: string) {
     try {
       // Get proposal
-      const proposal = await this.prisma.mintProposal.findUnique({
+      const proposal = await this.prisma.mint_proposals.findUnique({
         where: { proposalId },
       });
 
@@ -471,7 +471,7 @@ export class TokensService {
       // Execute mint (similar to mint method)
       // This would call the mint() method with proposal data
       // For now, mark as executed
-      const updatedProposal = await this.prisma.mintProposal.update({
+      const updatedProposal = await this.prisma.mint_proposals.update({
         where: { proposalId },
         data: {
           status: 'EXECUTED',
@@ -508,7 +508,7 @@ export class TokensService {
       where.status = status;
     }
 
-    const proposals = await this.prisma.mintProposal.findMany({
+    const proposals = await this.prisma.mint_proposals.findMany({
       where,
       orderBy: { createdAt: 'desc' },
     });

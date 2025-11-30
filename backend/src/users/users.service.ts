@@ -8,7 +8,7 @@ import { PrismaService } from '../common/prisma/prisma.service';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UploadKycDto } from './dto/upload-kyc.dto';
 import { UpdateKycStatusDto } from './dto/update-kyc-status.dto';
-import { KycStatus, UserRole } from '@prisma/client';
+import { users_kycStatus, users_role } from '@prisma/client';
 import * as speakeasy from 'speakeasy';
 import * as QRCode from 'qrcode';
 
@@ -17,10 +17,11 @@ export class UsersService {
   constructor(private prisma: PrismaService) {}
 
   async findById(id: string) {
-    const user = await this.prisma.user.findUnique({
+    const user = await this.prisma.users.findUnique({
       where: { id },
       select: {
         id: true,
+        twoFactorSecret: true,
         email: true,
         phone: true,
         firstName: true,
@@ -43,7 +44,7 @@ export class UsersService {
   }
 
   async findByEmail(email: string) {
-    return this.prisma.user.findUnique({
+    return this.prisma.users.findUnique({
       where: { email },
     });
   }
@@ -51,7 +52,7 @@ export class UsersService {
   async updateProfile(userId: string, updateUserDto: UpdateUserDto) {
     // Check if email or phone already exists
     if (updateUserDto.email || updateUserDto.phone) {
-      const existingUser = await this.prisma.user.findFirst({
+      const existingUser = await this.prisma.users.findFirst({
         where: {
           AND: [
             { id: { not: userId } },
@@ -70,7 +71,7 @@ export class UsersService {
       }
     }
 
-    return this.prisma.user.update({
+    return this.prisma.users.update({
       where: { id: userId },
       data: {
         ...updateUserDto,
@@ -94,40 +95,40 @@ export class UsersService {
     const user = await this.findById(userId);
 
     // Create KYC document
-    const kycDocument = await this.prisma.kycDocument.create({
+    const kycDocument = await this.prisma.kyc_documents.create({
       data: {
         userId,
         documentType: uploadKycDto.documentType,
         documentHash: uploadKycDto.documentHash,
         fileName: uploadKycDto.fileName,
         mimeType: uploadKycDto.mimeType,
-        status: KycStatus.SUBMITTED,
-      },
+        status: users_kycStatus.SUBMITTED,
+      } as any,
     });
 
     // Update user KYC status to SUBMITTED
-    await this.prisma.user.update({
+    await this.prisma.users.update({
       where: { id: userId },
       data: {
-        kycStatus: KycStatus.SUBMITTED,
+        kycStatus: users_kycStatus.SUBMITTED,
       },
     });
 
     return kycDocument;
   }
 
-  async updateKycStatus(userId: string, updateKycStatusDto: UpdateKycStatusDto) {
+  async updateusers_kycStatus(userId: string, updateusers_kycStatusDto: Updateusers_kycStatusDto) {
     const user = await this.findById(userId);
 
     const updateData: any = {
-      kycStatus: updateKycStatusDto.status,
+      kycStatus: updateusers_kycStatusDto.status,
     };
 
-    if (updateKycStatusDto.status === KycStatus.VERIFIED) {
+    if (updateusers_kycStatusDto.status === users_kycStatus.VERIFIED) {
       updateData.kycVerifiedAt = new Date();
     }
 
-    return this.prisma.user.update({
+    return this.prisma.users.update({
       where: { id: userId },
       data: updateData,
       select: {
@@ -159,7 +160,7 @@ export class UsersService {
         issuer: 'BRICSPAY Global',
       }).base32;
 
-      await this.prisma.user.update({
+      await this.prisma.users.update({
         where: { id: userId },
         data: { twoFactorSecret: secret },
       });
@@ -178,7 +179,7 @@ export class UsersService {
     }
 
     // Enable 2FA
-    await this.prisma.user.update({
+    await this.prisma.users.update({
       where: { id: userId },
       data: {
         twoFactorEnabled: true,
@@ -226,7 +227,7 @@ export class UsersService {
     }
 
     // Disable 2FA
-    await this.prisma.user.update({
+    await this.prisma.users.update({
       where: { id: userId },
       data: {
         twoFactorEnabled: false,
@@ -238,8 +239,8 @@ export class UsersService {
   }
 
   async getAllUsers(filters?: {
-    role?: UserRole;
-    kycStatus?: KycStatus;
+    role?: users_role;
+    kycStatus?: users_kycStatus;
     search?: string;
   }, pagination?: {
     page?: number;
@@ -269,7 +270,7 @@ export class UsersService {
     }
 
     const [users, total] = await Promise.all([
-      this.prisma.user.findMany({
+      this.prisma.users.findMany({
         where,
         skip,
         take: limit,
@@ -287,7 +288,7 @@ export class UsersService {
           createdAt: true,
         },
       }),
-      this.prisma.user.count({ where }),
+      this.prisma.users.count({ where }),
     ]);
 
     return {
@@ -309,13 +310,13 @@ export class UsersService {
       institutionalUsers,
       twoFactorEnabled,
     ] = await Promise.all([
-      this.prisma.user.count(),
-      this.prisma.user.count({ where: { kycStatus: KycStatus.VERIFIED } }),
-      this.prisma.user.count({
-        where: { kycStatus: { in: [KycStatus.PENDING, KycStatus.SUBMITTED] } },
+      this.prisma.users.count(),
+      this.prisma.users.count({ where: { kycStatus: users_kycStatus.VERIFIED } }),
+      this.prisma.users.count({
+        where: { kycStatus: { in: [users_kycStatus.PENDING, users_kycStatus.SUBMITTED] } },
       }),
-      this.prisma.user.count({ where: { role: UserRole.INSTITUTIONAL } }),
-      this.prisma.user.count({ where: { twoFactorEnabled: true } }),
+      this.prisma.users.count({ where: { role: users_role.INSTITUTIONAL } }),
+      this.prisma.users.count({ where: { twoFactorEnabled: true } }),
     ]);
 
     return {

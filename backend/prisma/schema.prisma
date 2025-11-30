@@ -1,6 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -10,152 +7,224 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// User Management
-model User {
-  id               String    @id @default(uuid())
-  email            String    @unique
-  phone            String?   @unique
-  passwordHash     String
-  firstName        String?
-  lastName         String?
-  role             UserRole  @default(INDIVIDUAL)
-  kycStatus        KycStatus @default(PENDING)
-  kycVerifiedAt    DateTime?
-  biometricEnabled Boolean   @default(false)
-  twoFactorEnabled Boolean   @default(false)
-  twoFactorSecret  String?
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+model audit_logs {
+  id           String   @id
+  userId       String?
+  action       String
+  resourceType String
+  resourceId   String?
+  details      String   @db.Text
+  ipAddress    String?
+  userAgent    String?
+  createdAt    DateTime @default(now())
+  users        users?   @relation(fields: [userId], references: [id])
 
-  // Relations
-  wallets       Wallet[]
-  kycDocuments  KycDocument[]
-  invoices      Invoice[]
-  auditLogs     AuditLog[]
-  mintProposals MintProposal[]
+  @@index([action])
+  @@index([createdAt])
+  @@index([resourceType])
+  @@index([userId])
+}
+
+model certificates {
+  id           String              @id
+  certId       String              @unique
+  grams        Decimal             @db.Decimal(18, 8)
+  mintTxHash   String?
+  createdAt    DateTime            @default(now())
+  mintedAt     DateTime?
+  mintedBy     String?
+  payload      String              @db.Text
+  payloadHash  String
+  signature    String?
+  status       certificates_status @default(PENDING)
+  updatedAt    DateTime
+  vaultCertId  String
+  vaultPartner String
+
+  @@index([certId])
+  @@index([status])
+  @@index([vaultPartner])
+}
+
+model invoices {
+  id                 String          @id
+  invoiceId          String          @unique
+  recipient          String
+  amount             Decimal         @db.Decimal(18, 8)
+  status             invoices_status @default(RECEIVED)
+  transferTxHash     String?
+  burnTxHash         String?
+  partnerId          String?
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime
+  burnBlockNumber    BigInt?
+  burnTimestamp      DateTime?
+  expiresAt          DateTime?
+  oracleSnapshotId   String?
+  payoutTxHash       String?
+  settlementAmount   Decimal?        @db.Decimal(18, 8)
+  settlementCurrency String?
+  userId             String
+  users              users           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  settlements        settlements?
+
+  @@index([invoiceId])
+  @@index([recipient])
+  @@index([status])
+  @@index([userId])
+}
+
+model kyc_documents {
+  id           String               @id
+  userId       String
+  documentType String
+  documentHash String
+  fileName     String
+  mimeType     String
+  status       kyc_documents_status @default(PENDING)
+  verifiedAt   DateTime?
+  expiresAt    DateTime?
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime
+  users        users                @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([documentHash])
+  @@index([userId])
+}
+
+model mint_proposals {
+  id         String                @id
+  proposalId String                @unique
+  userId     String
+  certId     String
+  to         String
+  amount     Decimal               @db.Decimal(18, 8)
+  metadata   String?               @db.Text
+  status     mint_proposals_status @default(PENDING)
+  signatures String                @db.Text
+  executedAt DateTime?
+  txHash     String?
+  createdAt  DateTime              @default(now())
+  updatedAt  DateTime
+  users      users                 @relation(fields: [userId], references: [id])
+
+  @@index([proposalId])
+  @@index([status])
+  @@index([userId], map: "mint_proposals_userId_fkey")
+}
+
+model oracle_snapshots {
+  id           String        @id
+  timestamp    DateTime
+  blockNumber  BigInt?
+  goldPriceUSD Decimal       @db.Decimal(18, 8)
+  fxRates      String        @db.Text
+  signature    String?
+  source       String
+  createdAt    DateTime      @default(now())
+  settlements  settlements[]
+
+  @@index([timestamp])
+}
+
+model partners {
+  id                  String          @id
+  name                String
+  apiKey              String          @unique
+  apiKeyHash          String
+  webhookUrl          String?
+  ipAllowlist         String?         @db.Text
+  supportedCurrencies String          @db.Text
+  status              partners_status @default(ACTIVE)
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime
+  settlements         settlements[]
+
+  @@index([apiKeyHash])
+  @@index([status])
+}
+
+model proof_of_reserve {
+  id             String   @id
+  merkleRoot     String   @unique
+  blockNumber    BigInt?
+  txHash         String?
+  certificateIds String   @db.Text
+  totalGrams     Decimal  @db.Decimal(18, 8)
+  signature      String?
+  createdAt      DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([merkleRoot])
+}
+
+model settlements {
+  id               String             @id
+  invoiceId        String             @unique
+  partnerId        String
+  amount           Decimal            @db.Decimal(18, 8)
+  currency         String
+  fxRate           Decimal            @db.Decimal(18, 8)
+  goldPrice        Decimal            @db.Decimal(18, 8)
+  oracleSnapshotId String
+  settlementPacket String             @db.Text
+  status           settlements_status @default(PENDING)
+  payoutTxHash     String?
+  confirmedAt      DateTime?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime
+  invoices         invoices           @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  oracle_snapshots oracle_snapshots   @relation(fields: [oracleSnapshotId], references: [id])
+  partners         partners           @relation(fields: [partnerId], references: [id])
+
+  @@index([invoiceId])
+  @@index([oracleSnapshotId])
+  @@index([partnerId])
+  @@index([status])
+}
+
+model users {
+  id               String           @id
+  email            String           @unique
+  phone            String?          @unique
+  passwordHash     String
+  role             users_role       @default(INDIVIDUAL)
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime
+  biometricEnabled Boolean          @default(false)
+  firstName        String?
+  kycStatus        users_kycStatus  @default(PENDING)
+  kycVerifiedAt    DateTime?
+  lastName         String?
+  twoFactorEnabled Boolean          @default(false)
+  twoFactorSecret  String?
+  audit_logs       audit_logs[]
+  invoices         invoices[]
+  kyc_documents    kyc_documents[]
+  mint_proposals   mint_proposals[]
+  wallets          wallets[]
 
   @@index([email])
   @@index([phone])
-  @@map("users")
 }
 
-enum UserRole {
-  INDIVIDUAL
-  INSTITUTIONAL
-  PARTNER
-  ADMIN
-}
-
-enum KycStatus {
-  PENDING
-  SUBMITTED
-  VERIFIED
-  REJECTED
-  EXPIRED
-}
-
-// KYC Documents
-model KycDocument {
-  id           String    @id @default(uuid())
-  userId       String
-  documentType String // PASSPORT, DRIVERS_LICENSE, NATIONAL_ID, etc.
-  documentHash String // SHA256 hash of document (not storing plaintext)
-  fileName     String
-  mimeType     String
-  status       KycStatus @default(PENDING)
-  verifiedAt   DateTime?
-  expiresAt    DateTime?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-  @@index([documentHash])
-  @@map("kyc_documents")
-}
-
-// Wallets (Custodial and Non-Custodial)
-model Wallet {
-  id                  String   @id @default(uuid())
-  userId              String
+model wallets {
+  id                  String   @id
   address             String   @unique
-  isCustodial         Boolean  @default(false)
-  privateKeyEncrypted String? // Encrypted private key for custodial wallets
-  network             String   @default("POLYGON")
-  isTestnet           Boolean  @default(true)
+  userId              String
   createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  isCustodial         Boolean  @default(false)
+  isTestnet           Boolean  @default(true)
+  network             String   @default("POLYGON")
+  privateKeyEncrypted String?
+  updatedAt           DateTime
+  users               users    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
   @@index([address])
-  @@map("wallets")
-}
-
-// Certificates (from Vault Partners)
-model Certificate {
-  id           String     @id @default(uuid())
-  certId       String     @unique // bytes32 hash from contract
-  vaultPartner String // MMTC_PAMP, AUGMONT, SAFEGOLD, DMCC
-  vaultCertId  String // Original certificate ID from vault
-  payload      String     @db.Text // JSON payload from vault
-  payloadHash  String // SHA256 hash of payload
-  signature    String? // Vault signature
-  grams        Decimal    @db.Decimal(18, 8) // Gold amount in grams
-  status       CertStatus @default(PENDING)
-  mintedAt     DateTime?
-  mintTxHash   String?
-  mintedBy     String? // User ID who initiated mint
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
-
-  @@index([certId])
-  @@index([vaultPartner])
-  @@index([status])
-  @@map("certificates")
-}
-
-enum CertStatus {
-  PENDING
-  VERIFIED
-  MINTED
-  REJECTED
-}
-
-// Invoices
-model Invoice {
-  id                 String        @id @default(uuid())
-  invoiceId          String        @unique // bytes32 hash (keccak256)
-  userId             String
-  recipient          String // Wallet address
-  amount             Decimal       @db.Decimal(18, 8) // GRX amount
-  status             InvoiceStatus @default(RECEIVED)
-  transferTxHash     String? // Original transfer transaction hash
-  burnTxHash         String? // Burn transaction hash
-  burnBlockNumber    BigInt?
-  burnTimestamp      DateTime?
-  settlementAmount   Decimal?      @db.Decimal(18, 8) // Fiat settlement amount
-  settlementCurrency String? // INR, AED, RUB, CNY, USD
-  partnerId          String? // Partner who will process payout
-  payoutTxHash       String? // Partner payout transaction hash
-  oracleSnapshotId   String? // Reference to oracle snapshot used
-  expiresAt          DateTime?
-  createdAt          DateTime      @default(now())
-  updatedAt          DateTime      @updatedAt
-
-  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  settlement Settlement?
-
-  @@index([invoiceId])
   @@index([userId])
-  @@index([status])
-  @@index([recipient])
-  @@map("invoices")
 }
 
-enum InvoiceStatus {
+enum invoices_status {
   RECEIVED
   AWAITING_REDEEM
   BURN_PENDING
@@ -164,107 +233,22 @@ enum InvoiceStatus {
   EXPIRED
 }
 
-// Settlements
-model Settlement {
-  id               String           @id @default(uuid())
-  invoiceId        String           @unique
-  invoice          Invoice          @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
-  partnerId        String
-  partner          Partner          @relation(fields: [partnerId], references: [id])
-  amount           Decimal          @db.Decimal(18, 8)
-  currency         String // INR, AED, RUB, CNY, USD
-  fxRate           Decimal          @db.Decimal(18, 8)
-  goldPrice        Decimal          @db.Decimal(18, 8)
-  oracleSnapshotId String
-  oracleSnapshot   OracleSnapshot   @relation(fields: [oracleSnapshotId], references: [id])
-  settlementPacket String           @db.Text // Signed settlement packet (JSON)
-  status           SettlementStatus @default(PENDING)
-  payoutTxHash     String?
-  confirmedAt      DateTime?
-  createdAt        DateTime         @default(now())
-  updatedAt        DateTime         @updatedAt
-
-  @@index([invoiceId])
-  @@index([partnerId])
-  @@index([oracleSnapshotId])
-  @@index([status])
-  @@map("settlements")
+enum users_role {
+  INDIVIDUAL
+  INSTITUTIONAL
+  PARTNER
+  ADMIN
 }
 
-enum SettlementStatus {
+enum kyc_documents_status {
   PENDING
-  SENT
-  CONFIRMED
-  FAILED
+  SUBMITTED
+  VERIFIED
+  REJECTED
+  EXPIRED
 }
 
-// Oracle Snapshots
-model OracleSnapshot {
-  id           String   @id @default(uuid())
-  timestamp    DateTime
-  blockNumber  BigInt?
-  goldPriceUSD Decimal  @db.Decimal(18, 8)
-  fxRates      String   @db.Text // JSON: { INR: 83.5, AED: 3.67, ... }
-  signature    String? // Server signature
-  source       String // LBMA, COMEX, MCX, AGGREGATE
-  createdAt    DateTime @default(now())
-
-  settlements Settlement[]
-
-  @@index([timestamp])
-  @@map("oracle_snapshots")
-}
-
-// Partners
-model Partner {
-  id                  String        @id @default(uuid())
-  name                String
-  apiKey              String        @unique
-  apiKeyHash          String // SHA256 hash of API key
-  webhookUrl          String?
-  ipAllowlist         String?       @db.Text // JSON array of IPs
-  supportedCurrencies String        @db.Text // JSON array: ["INR", "AED"]
-  status              PartnerStatus @default(ACTIVE)
-  createdAt           DateTime      @default(now())
-  updatedAt           DateTime      @updatedAt
-
-  settlements Settlement[]
-
-  @@index([apiKeyHash])
-  @@index([status])
-  @@map("partners")
-}
-
-enum PartnerStatus {
-  ACTIVE
-  INACTIVE
-  SUSPENDED
-}
-
-// Mint Proposals (for Multisig)
-model MintProposal {
-  id         String         @id @default(uuid())
-  proposalId String         @unique
-  userId     String
-  certId     String
-  to         String // Wallet address
-  amount     Decimal        @db.Decimal(18, 8)
-  metadata   String?        @db.Text
-  status     ProposalStatus @default(PENDING)
-  signatures String         @db.Text // JSON array of signatures
-  executedAt DateTime?
-  txHash     String?
-  createdAt  DateTime       @default(now())
-  updatedAt  DateTime       @updatedAt
-
-  user User @relation(fields: [userId], references: [id])
-
-  @@index([proposalId])
-  @@index([status])
-  @@map("mint_proposals")
-}
-
-enum ProposalStatus {
+enum mint_proposals_status {
   PENDING
   APPROVED
   EXECUTED
@@ -272,39 +256,30 @@ enum ProposalStatus {
   EXPIRED
 }
 
-// Audit Logs
-model AuditLog {
-  id           String   @id @default(uuid())
-  userId       String?
-  action       String // MINT, BURN, SETTLEMENT, etc.
-  resourceType String // TOKEN, INVOICE, CERTIFICATE, etc.
-  resourceId   String?
-  details      String   @db.Text // JSON details
-  ipAddress    String?
-  userAgent    String?
-  createdAt    DateTime @default(now())
-
-  user User? @relation(fields: [userId], references: [id])
-
-  @@index([userId])
-  @@index([action])
-  @@index([resourceType])
-  @@index([createdAt])
-  @@map("audit_logs")
+enum partners_status {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
 }
 
-// Proof of Reserve
-model ProofOfReserve {
-  id             String   @id @default(uuid())
-  merkleRoot     String   @unique
-  blockNumber    BigInt?
-  txHash         String?
-  certificateIds String   @db.Text // JSON array of certificate IDs
-  totalGrams     Decimal  @db.Decimal(18, 8)
-  signature      String?
-  createdAt      DateTime @default(now())
+enum users_kycStatus {
+  PENDING
+  SUBMITTED
+  VERIFIED
+  REJECTED
+  EXPIRED
+}
 
-  @@index([merkleRoot])
-  @@index([createdAt])
-  @@map("proof_of_reserve")
+enum settlements_status {
+  PENDING
+  SENT
+  CONFIRMED
+  FAILED
+}
+
+enum certificates_status {
+  PENDING
+  VERIFIED
+  MINTED
+  REJECTED
 }

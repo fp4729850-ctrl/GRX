@@ -109,7 +109,7 @@ export class CertificatesService {
       );
 
       // Check if certificate already exists
-      const existing = await this.prisma.certificate.findUnique({
+      const existing = await this.prisma.certificates.findUnique({
         where: { certId },
       });
 
@@ -132,7 +132,7 @@ export class CertificatesService {
       }
 
       // Create certificate
-      const certificate = await this.prisma.certificate.create({
+      const certificate = await this.prisma.certificates.create({
         data: {
           certId,
           vaultPartner: dto.vaultPartner,
@@ -189,7 +189,7 @@ export class CertificatesService {
    */
   async verifyCertificate(dto: VerifyCertificateDto) {
     try {
-      const certificate = await this.prisma.certificate.findUnique({
+      const certificate = await this.prisma.certificates.findUnique({
         where: { certId: dto.certId },
       });
 
@@ -207,7 +207,7 @@ export class CertificatesService {
 
         if (!isValidSignature) {
           // Update status to REJECTED
-          await this.prisma.certificate.update({
+          await this.prisma.certificates.update({
             where: { certId: dto.certId },
             data: { status: 'REJECTED' },
           });
@@ -216,7 +216,7 @@ export class CertificatesService {
         }
 
         // Update status to VERIFIED
-        const updated = await this.prisma.certificate.update({
+        const updated = await this.prisma.certificates.update({
           where: { certId: dto.certId },
           data: { status: 'VERIFIED' },
         });
@@ -265,7 +265,7 @@ export class CertificatesService {
    * Get certificate by certId
    */
   async getCertificate(certId: string) {
-    const certificate = await this.prisma.certificate.findUnique({
+    const certificate = await this.prisma.certificates.findUnique({
       where: { certId },
     });
 
@@ -303,13 +303,13 @@ export class CertificatesService {
     }
 
     const [certificates, total] = await Promise.all([
-      this.prisma.certificate.findMany({
+      this.prisma.certificates.findMany({
         where,
         orderBy: { createdAt: 'desc' },
         take: limit,
         skip: offset,
       }),
-      this.prisma.certificate.count({ where }),
+      this.prisma.certificates.count({ where }),
     ]);
 
     return {
@@ -336,13 +336,13 @@ export class CertificatesService {
    */
   async getPendingCertificates(limit: number = 50, offset: number = 0) {
     const [certificates, total] = await Promise.all([
-      this.prisma.certificate.findMany({
+      this.prisma.certificates.findMany({
         where: { status: 'PENDING' },
         orderBy: { createdAt: 'desc' },
         take: limit,
         skip: offset,
       }),
-      this.prisma.certificate.count({ where: { status: 'PENDING' } }),
+      this.prisma.certificates.count({ where: { status: 'PENDING' } }),
     ]);
 
     return {
@@ -372,7 +372,7 @@ export class CertificatesService {
     dto: UpdateCertificateStatusDto,
   ) {
     try {
-      const certificate = await this.prisma.certificate.findUnique({
+      const certificate = await this.prisma.certificates.findUnique({
         where: { certId },
       });
 
@@ -406,7 +406,7 @@ export class CertificatesService {
         }
       }
 
-      const updated = await this.prisma.certificate.update({
+      const updated = await this.prisma.certificates.update({
         where: { certId },
         data: updateData,
       });

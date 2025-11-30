@@ -57,7 +57,7 @@ export class InvoicesService {
       }
 
       // Check if invoice already exists
-      const existing = await this.prisma.invoice.findUnique({
+      const existing = await this.prisma.invoices.findUnique({
         where: { invoiceId: dto.invoiceId },
       });
 
@@ -75,7 +75,7 @@ export class InvoicesService {
       expiresAt.setHours(expiresAt.getHours() + this.DEFAULT_EXPIRY_HOURS);
 
       // Create invoice
-      const invoice = await this.prisma.invoice.create({
+      const invoice = await this.prisma.invoices.create({
         data: {
           invoiceId: dto.invoiceId,
           userId,
@@ -136,7 +136,7 @@ export class InvoicesService {
    * Get invoice by ID
    */
   async getInvoiceById(invoiceId: string, userId?: string) {
-    const invoice = await this.prisma.invoice.findUnique({
+    const invoice = await this.prisma.invoices.findUnique({
       where: { invoiceId },
     });
 
@@ -184,13 +184,13 @@ export class InvoicesService {
     }
 
     const [invoices, total] = await Promise.all([
-      this.prisma.invoice.findMany({
+      this.prisma.invoices.findMany({
         where,
         orderBy: { createdAt: 'desc' },
         take: limit,
         skip: offset,
       }),
-      this.prisma.invoice.count({ where }),
+      this.prisma.invoices.count({ where }),
     ]);
 
     return {
@@ -228,13 +228,13 @@ export class InvoicesService {
     }
 
     const [invoices, total] = await Promise.all([
-      this.prisma.invoice.findMany({
+      this.prisma.invoices.findMany({
         where,
         orderBy: { createdAt: 'desc' },
         take: limit,
         skip: offset,
       }),
-      this.prisma.invoice.count({ where }),
+      this.prisma.invoices.count({ where }),
     ]);
 
     return {
@@ -262,7 +262,7 @@ export class InvoicesService {
    */
   async redeemInvoice(userId: string, dto: RedeemInvoiceDto) {
     try {
-      const invoice = await this.prisma.invoice.findUnique({
+      const invoice = await this.prisma.invoices.findUnique({
         where: { invoiceId: dto.invoiceId },
       });
 
@@ -282,7 +282,7 @@ export class InvoicesService {
 
       // Check if expired
       if (invoice.expiresAt && invoice.expiresAt < new Date()) {
-        await this.prisma.invoice.update({
+        await this.prisma.invoices.update({
           where: { invoiceId: dto.invoiceId },
           data: { status: 'EXPIRED' },
         });
@@ -290,7 +290,7 @@ export class InvoicesService {
       }
 
       // Update status
-      const updated = await this.prisma.invoice.update({
+      const updated = await this.prisma.invoices.update({
         where: { invoiceId: dto.invoiceId },
         data: {
           status: 'AWAITING_REDEEM',
@@ -335,7 +335,7 @@ export class InvoicesService {
    */
   async settleInvoice(userId: string, dto: SettleInvoiceDto) {
     try {
-      const invoice = await this.prisma.invoice.findUnique({
+      const invoice = await this.prisma.invoices.findUnique({
         where: { invoiceId: dto.invoiceId },
       });
 
@@ -351,7 +351,7 @@ export class InvoicesService {
 
       // Check if expired
       if (invoice.expiresAt && invoice.expiresAt < new Date()) {
-        await this.prisma.invoice.update({
+        await this.prisma.invoices.update({
           where: { invoiceId: dto.invoiceId },
           data: { status: 'EXPIRED' },
         });
@@ -373,7 +373,7 @@ export class InvoicesService {
       // 3. Calculate settlement amount = (GRX amount * gold price * FX rate)
       // 4. Create settlement record
 
-      const updated = await this.prisma.invoice.update({
+      const updated = await this.prisma.invoices.update({
         where: { invoiceId: dto.invoiceId },
         data: {
           status: 'SETTLED',
@@ -425,7 +425,7 @@ export class InvoicesService {
     userId?: string,
   ) {
     try {
-      const invoice = await this.prisma.invoice.findUnique({
+      const invoice = await this.prisma.invoices.findUnique({
         where: { invoiceId },
       });
 
@@ -459,7 +459,7 @@ export class InvoicesService {
         updateData.payoutTxHash = dto.payoutTxHash;
       }
 
-      const updated = await this.prisma.invoice.update({
+      const updated = await this.prisma.invoices.update({
         where: { invoiceId },
         data: updateData,
       });
@@ -500,7 +500,7 @@ export class InvoicesService {
    * Check and expire old invoices (should be called by a scheduled job)
    */
   async expireOldInvoices() {
-    const expired = await this.prisma.invoice.updateMany({
+    const expired = await this.prisma.invoices.updateMany({
       where: {
         status: {
           in: ['RECEIVED', 'AWAITING_REDEEM', 'BURN_PENDING'],
@@ -523,8 +523,8 @@ export class InvoicesService {
    */
   async getInvoiceStats(userId: string) {
     const [total, byStatus] = await Promise.all([
-      this.prisma.invoice.count({ where: { userId } }),
-      this.prisma.invoice.groupBy({
+      this.prisma.invoices.count({ where: { userId } }),
+      this.prisma.invoices.groupBy({
         by: ['status'],
         where: { userId },
         _count: true,

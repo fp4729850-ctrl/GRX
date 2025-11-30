@@ -126,8 +126,9 @@ export class SettlementsService {
       );
 
       // Create settlement
-      const settlement = await this.prisma.settlement.create({
+      const settlement = await this.prisma.settlements.create({
         data: {
+          id: undefined, // Will be auto-generated
           invoiceId: dto.invoiceId,
           partnerId: dto.partnerId,
           amount: settlementAmount,
@@ -137,7 +138,8 @@ export class SettlementsService {
           oracleSnapshotId: snapshotData.id,
           settlementPacket,
           status: 'PENDING',
-        },
+          updatedAt: new Date(),
+        } as any,
       });
 
       // Update invoice status
@@ -190,7 +192,7 @@ export class SettlementsService {
    */
   async processSettlement(settlementId: string, dto: ProcessSettlementDto) {
     try {
-      const settlement = await this.prisma.settlement.findUnique({
+      const settlement = await this.prisma.settlements.findUnique({
         where: { id: settlementId },
       });
 
@@ -209,7 +211,7 @@ export class SettlementsService {
         updateData.payoutTxHash = dto.payoutTxHash;
       }
 
-      const updated = await this.prisma.settlement.update({
+      const updated = await this.prisma.settlements.update({
         where: { id: settlementId },
         data: updateData,
       });
@@ -249,7 +251,7 @@ export class SettlementsService {
    */
   async confirmSettlement(settlementId: string) {
     try {
-      const settlement = await this.prisma.settlement.findUnique({
+      const settlement = await this.prisma.settlements.findUnique({
         where: { id: settlementId },
       });
 
@@ -263,7 +265,7 @@ export class SettlementsService {
         );
       }
 
-      const updated = await this.prisma.settlement.update({
+      const updated = await this.prisma.settlements.update({
         where: { id: settlementId },
         data: {
           status: 'CONFIRMED',
@@ -304,11 +306,11 @@ export class SettlementsService {
    * Get settlement by ID
    */
   async getSettlement(settlementId: string) {
-    const settlement = await this.prisma.settlement.findUnique({
+    const settlement = await this.prisma.settlements.findUnique({
       where: { id: settlementId },
-      include: {
-        invoice: true,
-      },
+        include: {
+          invoices: true,
+        },
     });
 
     if (!settlement) {
@@ -348,13 +350,13 @@ export class SettlementsService {
     }
 
     const [settlements, total] = await Promise.all([
-      this.prisma.settlement.findMany({
+      this.prisma.settlements.findMany({
         where,
         orderBy: { createdAt: 'desc' },
         take: limit,
         skip: offset,
       }),
-      this.prisma.settlement.count({ where }),
+      this.prisma.settlements.count({ where }),
     ]);
 
     return {

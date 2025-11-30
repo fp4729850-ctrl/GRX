@@ -18,7 +18,7 @@ export class AuthService {
     const { email, password, phone, firstName, lastName } = registerDto;
 
     // Check if user already exists
-    const existingUser = await this.prisma.user.findFirst({
+    const existingUser = await this.prisma.users.findFirst({
       where: {
         OR: [
           { email },
@@ -35,7 +35,7 @@ export class AuthService {
     const passwordHash = await bcrypt.hash(password, 10);
 
     // Create user
-    const user = await this.prisma.user.create({
+    const user = await this.prisma.users.create({
       data: {
         email,
         phone,
@@ -68,7 +68,7 @@ export class AuthService {
   async login(loginDto: LoginDto) {
     const { email, password } = loginDto;
 
-    const user = await this.prisma.user.findUnique({
+    const user = await this.prisma.users.findUnique({
       where: { email },
     });
 
@@ -111,7 +111,7 @@ export class AuthService {
   }
 
   async validateUser(userId: string) {
-    const user = await this.prisma.user.findUnique({
+    const user = await this.prisma.users.findUnique({
       where: { id: userId },
       select: {
         id: true,
