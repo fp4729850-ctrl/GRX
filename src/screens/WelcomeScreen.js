@@ -6,7 +6,16 @@ import {
   TouchableOpacity,
   Animated,
 } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
 import { theme } from '../styles/theme';
+
+// Gold color constants
+const GOLD_COLORS = {
+  primary: '#D4AF37',
+  light: '#F4E4BC',
+  dark: '#B8941F',
+  accent: '#FFD700',
+};
 
 const WelcomeScreen = ({ navigation }) => {
   const fadeAnim = React.useRef(new Animated.Value(0)).current;
@@ -22,6 +31,9 @@ const WelcomeScreen = ({ navigation }) => {
   return (
     <View style={styles.container}>
       <Animated.View style={[styles.content, { opacity: fadeAnim }]}>
+        <View style={styles.iconContainer}>
+          <MaterialIcons name="account-balance-wallet" size={80} color={GOLD_COLORS.primary} />
+        </View>
         <Text style={styles.title}>GRX</Text>
         <Text style={styles.subtitle}>Your Secure Crypto Wallet</Text>
         <Text style={styles.description}>
@@ -61,10 +73,19 @@ const styles = StyleSheet.create({
     maxWidth: 400,
     alignItems: 'center',
   },
+  iconContainer: {
+    width: 140,
+    height: 140,
+    borderRadius: 70,
+    backgroundColor: GOLD_COLORS.light,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: theme.spacing.lg,
+  },
   title: {
     fontSize: 48,
     fontWeight: 'bold',
-    color: theme.colors.primary,
+    color: GOLD_COLORS.primary,
     marginBottom: theme.spacing.sm,
   },
   subtitle: {
@@ -85,7 +106,7 @@ const styles = StyleSheet.create({
     gap: theme.spacing.md,
   },
   primaryButton: {
-    backgroundColor: theme.colors.primary,
+    backgroundColor: GOLD_COLORS.primary,
     paddingVertical: theme.spacing.md,
     paddingHorizontal: theme.spacing.lg,
     borderRadius: theme.borderRadius.lg,
@@ -104,11 +125,11 @@ const styles = StyleSheet.create({
     borderRadius: theme.borderRadius.lg,
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: theme.colors.primary,
+    borderColor: GOLD_COLORS.primary,
     ...theme.shadows.small,
   },
   secondaryButtonText: {
-    color: theme.colors.primary,
+    color: GOLD_COLORS.primary,
     fontSize: 18,
     fontWeight: '600',
   },

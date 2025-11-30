@@ -272,6 +272,20 @@ Perc4_En                    = input.bool(defval = true, title = '',inline = '2',
 Perc4_input                 = input.string(defval = '80',title = 'USDT for trade-4 ',inline = '2',group = grop_per)
 Perc5_En                    = input.bool(defval = true, title = '',inline = '3',group = grop_per)
 Perc5_input                 = input.string(defval = '90',title = 'USDT for trade-5 ',inline = '3',group = grop_per)
+Perc6_En                    = input.bool(defval = true, title = '',inline = '3',group = grop_per)
+Perc6_input                 = input.string(defval = '100',title = 'USDT for trade-6 ',inline = '3',group = grop_per)
+Perc7_En                    = input.bool(defval = true, title = '',inline = '4',group = grop_per)
+Perc7_input                 = input.string(defval = '50',title = 'USDT for trade-7 ',inline = '4',group = grop_per)
+Perc8_En                    = input.bool(defval = true, title = '',inline = '4',group = grop_per)
+Perc8_input                 = input.string(defval = '60',title = 'USDT for trade-8 ',inline = '4',group = grop_per)
+Perc9_En                    = input.bool(defval = true, title = '',inline = '5',group = grop_per)
+Perc9_input                 = input.string(defval = '70',title = 'USDT for trade-9 ',inline = '5',group = grop_per)
+Perc10_En                   = input.bool(defval = true, title = '',inline = '5',group = grop_per)
+Perc10_input                = input.string(defval = '80',title = 'USDT for trade-10 ',inline = '5',group = grop_per)
+Perc11_En                   = input.bool(defval = true, title = '',inline = '10',group = grop_per)
+Perc11_input                = input.string(defval = '90',title = 'USDT for trade-11 ',inline = '10',group = grop_per)
+Perc12_En                   = input.bool(defval = true, title = '',inline = '10',group = grop_per)
+Perc12_input                = input.string(defval = '100',title = 'USDT for trade-12 ',inline = '10',group = grop_per)
 
 grop_per_auto               = 'Auto Percentage Settings'
 initial_per                 = 50//input.float(defval = 50,title = '% for first trade',inline = '1',group = grop_per_auto)
@@ -478,8 +492,20 @@ getUsdtAmount() =>
             q := Perc4_input
         else if quantity_per.get(0) == 5
             q := Perc5_input
-        else
-            q := Perc5_input
+        else if quantity_per.get(0) == 6
+            q := Perc6_input
+        else if quantity_per.get(0) == 7
+            q := Perc7_input
+        else if quantity_per.get(0) == 8
+            q := Perc8_input
+        else if quantity_per.get(0) == 9
+            q := Perc9_input
+        else if quantity_per.get(0) == 10
+            q := Perc10_input
+        else if quantity_per.get(0) == 11
+            q := Perc11_input
+        else if quantity_per.get(0) == 12
+            q := Perc12_input
     else
         q := str.tostring(quantity_per.get(0))
     q
@@ -491,6 +517,61 @@ syntaxFun(is_reduce_only)=>
     alert_mesg
 
 var close_id = array.new<int>(1,0)
+
+// --- ENABLED TRADE TRACKING ---
+var int enabled_trade_count = 0  // Count of enabled trades executed in current sequence
+var bool waiting_for_tp = false  // Flag to wait for TP after 5th enabled trade
+
+// Function to check if a trade level checkbox is enabled
+isTradeEnabled(tradeNum) =>
+    if tradeNum == 1
+        Perc1_En
+    else if tradeNum == 2
+        Perc2_En
+    else if tradeNum == 3
+        Perc3_En
+    else if tradeNum == 4
+        Perc4_En
+    else if tradeNum == 5
+        Perc5_En
+    else if tradeNum == 6
+        Perc6_En
+    else if tradeNum == 7
+        Perc7_En
+    else if tradeNum == 8
+        Perc8_En
+    else if tradeNum == 9
+        Perc9_En
+    else if tradeNum == 10
+        Perc10_En
+    else if tradeNum == 11
+        Perc11_En
+    else if tradeNum == 12
+        Perc12_En
+    else
+        false
+
+// Function to find next enabled trade level starting from current
+findNextEnabledTrade(startFrom) =>
+    int nextEnabled = na
+    for i = startFrom to 12
+        if isTradeEnabled(i)
+            nextEnabled := i
+            break
+    nextEnabled
+
+// Check if current trade level is enabled
+isCurrentTradeEnabled() =>
+    isTradeEnabled(int(quantity_per.get(0)))
+
+// Check if we should allow new entry (not blocked by 5-trade limit)
+canEnterNewTrade() =>
+    if waiting_for_tp
+        false  // Block new entries while waiting for TP
+    else if enabled_trade_count >= 5
+        false  // Block after 5 enabled trades
+    else
+        true
 
 calculate_pnl()=>
     var float PNL = 0.0
@@ -512,27 +593,33 @@ mannualPercantage(side,trans)=>
             quantity_per.set(0,1)
             if startPerAfterLoss_En and PNL<0 and math.abs(PNL) >= startPerAfterLoss
                 if PNL > 0
-                    quantity_per.set(0,1)
+                    // Reset to first enabled trade
+                    firstEnabled = findNextEnabledTrade(1)
+                    quantity_per.set(0, na(firstEnabled) ? 1 : firstEnabled)
                 else if PNL == 0
                     quantity_per.set(0,quantity_per.get(0))
                 else
-                    if quantity_per.get(0)==5
-                        quantity_per.set(0,5)
+                    if quantity_per.get(0)==12
+                        quantity_per.set(0,12)
                     else
-                        quantity_per.set(0,quantity_per.get(0)+1)
+                        nextTrade = findNextEnabledTrade(int(quantity_per.get(0)) + 1)
+                        quantity_per.set(0, na(nextTrade) ? 12 : nextTrade)
                 startCountBool.set(0,false)
             if startPerAfterLoss_En == false
                 startCountBool.set(0,false)
         else
             if PNL > 0
-                quantity_per.set(0,1)
+                // Reset to first enabled trade
+                firstEnabled = findNextEnabledTrade(1)
+                quantity_per.set(0, na(firstEnabled) ? 1 : firstEnabled)
             else if PNL == 0
                 quantity_per.set(0,quantity_per.get(0))
             else
-                if quantity_per.get(0)==5
-                    quantity_per.set(0,5)
+                if quantity_per.get(0)==12
+                    quantity_per.set(0,12)
                 else
-                    quantity_per.set(0,quantity_per.get(0)+1)
+                    nextTrade = findNextEnabledTrade(int(quantity_per.get(0)) + 1)
+                    quantity_per.set(0, na(nextTrade) ? 12 : nextTrade)
     else
         if startCountBool.get(0)
             quantity_per.set(0,initial_per)
@@ -571,12 +658,18 @@ whenClosed()=>
         if closed_ac_buy_entry or closed_ac_sell_entry
             close_id.set(0,strategy.closedtrades)
             if PNL > 0
-                quantity_per.set(0,1)
+                // Reset to first enabled trade
+                firstEnabled = findNextEnabledTrade(1)
+                quantity_per.set(0, na(firstEnabled) ? 1 : firstEnabled)
 
 countTradeFromDate = input.time(defval = timestamp("1 Oct 2024 00:00:00 UTC+5:30"), title ="Count first Trade qty from ?",group = grop_per)
 startCount =  time('','UTC+5:30') == countTradeFromDate
 if startCount
-    quantity_per.set(0,1)
+    // Find first enabled trade
+    firstEnabled = findNextEnabledTrade(1)
+    quantity_per.set(0, na(firstEnabled) ? 1 : firstEnabled)
+    enabled_trade_count := 0
+    waiting_for_tp := false
     startCountBool.set(0,true)
 
 exit_candle = (strategy.closedtrades > 0 and strategy.closedtrades.exit_bar_index(strategy.closedtrades - 1) == bar_index) or (strategy.position_size[1] != 0 and strategy.position_size == 0)
@@ -779,7 +872,7 @@ final_sell = sell_sha
 
 
 
-if final_buy and (block_entry ? can_open_buy : true) and buy_occur==false and strategy.position_size == 0
+if final_buy and (block_entry ? can_open_buy : true) and buy_occur==false and strategy.position_size == 0 and canEnterNewTrade() and isCurrentTradeEnabled()
 
     // label.new(bar_index,high,color = color.green,force_overlay = true)
 
@@ -799,6 +892,14 @@ if final_buy and (block_entry ? can_open_buy : true) and buy_occur==false and st
         mannualPercantage(1,'buy')
     else
         mannualPercantage(0,'buy')
+    
+    // Increment enabled trade count
+    enabled_trade_count := enabled_trade_count + 1
+    
+    // If this is the 5th enabled trade, set waiting flag
+    if enabled_trade_count >= 5
+        waiting_for_tp := true
+    
     string usdt_amount_str = getUsdtAmount()
     float usdt_amount = str.tonumber(usdt_amount_str)
     float quantity_to_trade = usdt_amount > 0 ? usdt_amount / close : 0
@@ -831,7 +932,7 @@ if final_buy and (block_entry ? can_open_buy : true) and buy_occur==false and st
 
 
 
-if final_sell and (block_entry ? can_open_sell : true) and sell_occur==false  and strategy.position_size == 0
+if final_sell and (block_entry ? can_open_sell : true) and sell_occur==false  and strategy.position_size == 0 and canEnterNewTrade() and isCurrentTradeEnabled()
  
 
 
@@ -852,6 +953,14 @@ if final_sell and (block_entry ? can_open_sell : true) and sell_occur==false  an
         mannualPercantage(1,'sell')
     else
         mannualPercantage(0,'sell')
+    
+    // Increment enabled trade count
+    enabled_trade_count := enabled_trade_count + 1
+    
+    // If this is the 5th enabled trade, set waiting flag
+    if enabled_trade_count >= 5
+        waiting_for_tp := true
+    
     string usdt_amount_str = getUsdtAmount()
     float usdt_amount = str.tonumber(usdt_amount_str)
     float quantity_to_trade = usdt_amount > 0 ? usdt_amount / close : 0
@@ -1009,6 +1118,16 @@ if exit_candle
         else
             can_open_sell := false
             can_open_buy := true
+        
+        // Check if TP was hit (profit > 0) and we were waiting for TP
+        last_profit = strategy.closedtrades.profit(strategy.closedtrades - 1)
+        if waiting_for_tp and last_profit > 0
+            // TP hit - reset to trade-1 and restart sequence
+            enabled_trade_count := 0
+            waiting_for_tp := false
+            // Find first enabled trade (might not be 1 if Perc1_En is false)
+            firstEnabled = findNextEnabledTrade(1)
+            quantity_per.set(0, na(firstEnabled) ? 1 : firstEnabled)
             
 
     // label.new(bar_index,high,force_overlay = true)

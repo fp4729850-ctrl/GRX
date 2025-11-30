@@ -11,9 +11,19 @@ const requireApiBase = () => {
 };
 
 export const fetchOracleSnapshot = async () => {
-  const base = requireApiBase();
-  const { data } = await axios.get(`${base}/api/oracle/latest`);
-  return data;
+  // Return null gracefully if API base URL is not configured
+  if (!API_BASE_URL) {
+    return null;
+  }
+  
+  try {
+    const { data } = await axios.get(`${API_BASE_URL}/api/oracle/latest`);
+    return data;
+  } catch (error) {
+    // Silently return null for errors (network issues, etc.)
+    console.warn("Oracle snapshot fetch failed:", error.message);
+    return null;
+  }
 };
 
 

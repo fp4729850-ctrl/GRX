@@ -9,8 +9,17 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
 import { storePINHash } from '../services/storageService';
 import { theme } from '../styles/theme';
+
+// Gold color constants
+const GOLD_COLORS = {
+  primary: '#D4AF37',
+  light: '#F4E4BC',
+  dark: '#B8941F',
+  accent: '#FFD700',
+};
 
 const PINSetupScreen = ({ navigation, route }) => {
   const { onComplete } = route.params || {};
@@ -78,6 +87,9 @@ const PINSetupScreen = ({ navigation, route }) => {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <View style={styles.content}>
+        <View style={styles.iconContainer}>
+          <MaterialIcons name="lock" size={64} color={GOLD_COLORS.primary} />
+        </View>
         <Text style={styles.title}>
           {step === 1 ? 'Create PIN' : 'Confirm PIN'}
         </Text>
@@ -165,19 +177,28 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: theme.spacing.md,
   },
+  iconContainer: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: GOLD_COLORS.light,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: theme.spacing.lg,
+  },
   dot: {
     width: 16,
     height: 16,
     borderRadius: 8,
     borderWidth: 2,
-    borderColor: theme.colors.primary,
+    borderColor: GOLD_COLORS.primary,
     backgroundColor: 'transparent',
   },
   dotFilled: {
-    backgroundColor: theme.colors.primary,
+    backgroundColor: GOLD_COLORS.primary,
   },
   button: {
-    backgroundColor: theme.colors.primary,
+    backgroundColor: GOLD_COLORS.primary,
     paddingVertical: theme.spacing.md,
     paddingHorizontal: theme.spacing.xl,
     borderRadius: theme.borderRadius.lg,

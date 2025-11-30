@@ -11,8 +11,18 @@ import {
   Clipboard,
   Platform,
 } from 'react-native';
+import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import * as LocalAuthentication from 'expo-local-authentication';
 import { useWallet } from '../context/WalletContext';
+import { isAdminAddress } from '../utils/adminUtils';
+
+// Gold color constants
+const GOLD_COLORS = {
+  primary: '#D4AF37',
+  light: '#F4E4BC',
+  dark: '#B8941F',
+  accent: '#FFD700',
+};
 import {
   getMnemonic,
   getPINHash,
@@ -26,6 +36,7 @@ const isWeb = Platform.OS === 'web';
 
 const SettingsScreen = ({ navigation }) => {
   const {
+    walletAddress,
     isTestnet,
     currentNetwork,
     updateNetwork,
@@ -33,6 +44,7 @@ const SettingsScreen = ({ navigation }) => {
     custodialMode,
     updateCustodialMode,
   } = useWallet();
+  const isAdmin = isAdminAddress(walletAddress);
   const [biometricEnabled, setBiometricEnabledState] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -202,22 +214,34 @@ const SettingsScreen = ({ navigation }) => {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Network</Text>
+        <View style={styles.sectionHeader}>
+          <MaterialIcons name="settings-ethernet" size={20} color={GOLD_COLORS.primary} />
+          <Text style={styles.sectionTitle}>Network</Text>
+        </View>
         <View style={styles.settingRow}>
-          <Text style={styles.settingLabel}>Testnet Mode</Text>
+          <View style={styles.settingLabelRow}>
+            <Ionicons name="globe-outline" size={18} color={theme.colors.text} />
+            <Text style={styles.settingLabel}> Testnet Mode</Text>
+          </View>
           <Switch
             value={isTestnet}
             onValueChange={handleToggleTestnet}
-            trackColor={{ false: '#ccc', true: theme.colors.primary }}
+            trackColor={{ false: '#ccc', true: GOLD_COLORS.primary }}
           />
         </View>
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Wallet Mode</Text>
+        <View style={styles.sectionHeader}>
+          <MaterialIcons name="account-balance-wallet" size={20} color={GOLD_COLORS.primary} />
+          <Text style={styles.sectionTitle}>Wallet Mode</Text>
+        </View>
         <View style={styles.settingRow}>
           <View style={styles.settingColumn}>
-            <Text style={styles.settingLabel}>Use Custodial Wallet</Text>
+            <View style={styles.settingLabelRow}>
+              <MaterialIcons name="admin-panel-settings" size={18} color={theme.colors.text} />
+              <Text style={styles.settingLabel}> Use Custodial Wallet</Text>
+            </View>
             <Text style={styles.settingDescription}>
               {custodialMode
                 ? 'Transactions handled by backend administrators.'
@@ -227,46 +251,82 @@ const SettingsScreen = ({ navigation }) => {
           <Switch
             value={custodialMode}
             onValueChange={handleToggleCustodial}
-            trackColor={{ false: '#ccc', true: theme.colors.primary }}
+            trackColor={{ false: '#ccc', true: GOLD_COLORS.primary }}
           />
         </View>
       </View>
 
+      {isAdmin && (
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <MaterialIcons name="admin-panel-settings" size={20} color={GOLD_COLORS.primary} />
+            <Text style={styles.sectionTitle}>Administration</Text>
+          </View>
+          <TouchableOpacity
+            style={styles.settingRow}
+            onPress={() => navigation.navigate('AdminPanel')}
+          >
+            <View style={styles.settingLabelRow}>
+              <MaterialIcons name="dashboard" size={18} color={GOLD_COLORS.primary} />
+              <Text style={[styles.settingLabel, { color: GOLD_COLORS.primary, fontWeight: '600' }]}>
+                {' '}Admin Panel
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={GOLD_COLORS.primary} />
+          </TouchableOpacity>
+        </View>
+      )}
+
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Security</Text>
+        <View style={styles.sectionHeader}>
+          <MaterialIcons name="security" size={20} color={GOLD_COLORS.primary} />
+          <Text style={styles.sectionTitle}>Security</Text>
+        </View>
         <TouchableOpacity
           style={styles.settingRow}
           onPress={handleExportMnemonic}
         >
-          <Text style={styles.settingLabel}>Export Recovery Phrase</Text>
-          <Text style={styles.settingValue}>→</Text>
+          <View style={styles.settingLabelRow}>
+            <MaterialIcons name="vpn-key" size={18} color={theme.colors.text} />
+            <Text style={styles.settingLabel}> Export Recovery Phrase</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color={theme.colors.textSecondary} />
         </TouchableOpacity>
         {!isWeb && (
           <View style={styles.settingRow}>
-            <Text style={styles.settingLabel}>Biometric Authentication</Text>
+            <View style={styles.settingLabelRow}>
+              <Ionicons name="finger-print-outline" size={18} color={theme.colors.text} />
+              <Text style={styles.settingLabel}> Biometric Authentication</Text>
+            </View>
             <Switch
               value={biometricEnabled}
               onValueChange={handleToggleBiometric}
-              trackColor={{ false: '#ccc', true: theme.colors.primary }}
+              trackColor={{ false: '#ccc', true: GOLD_COLORS.primary }}
             />
           </View>
         )}
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Danger Zone</Text>
+        <View style={styles.sectionHeader}>
+          <MaterialIcons name="warning" size={20} color={theme.colors.error} />
+          <Text style={[styles.sectionTitle, styles.dangerText]}>Danger Zone</Text>
+        </View>
         <TouchableOpacity
           style={[styles.settingRow, styles.dangerRow]}
           onPress={handleClearData}
           disabled={loading}
         >
-          <Text style={[styles.settingLabel, styles.dangerText]}>
-            Clear All Data
-          </Text>
+          <View style={styles.settingLabelRow}>
+            <MaterialIcons name="delete-forever" size={18} color={theme.colors.error} />
+            <Text style={[styles.settingLabel, styles.dangerText]}>
+              {' '}Clear All Data
+            </Text>
+          </View>
           {loading ? (
             <ActivityIndicator color={theme.colors.error} />
           ) : (
-            <Text style={[styles.settingValue, styles.dangerText]}>→</Text>
+            <Ionicons name="chevron-forward" size={20} color={theme.colors.error} />
           )}
         </TouchableOpacity>
       </View>
@@ -287,13 +347,24 @@ const styles = StyleSheet.create({
     borderRadius: theme.borderRadius.md,
     marginBottom: theme.spacing.lg,
     padding: theme.spacing.md,
+    borderWidth: 1.5,
+    borderColor: GOLD_COLORS.light,
     ...theme.shadows.small,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: theme.spacing.md,
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
     color: theme.colors.text,
-    marginBottom: theme.spacing.md,
+    marginLeft: theme.spacing.xs,
+  },
+  settingLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   settingRow: {
     flexDirection: 'row',
@@ -315,10 +386,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: theme.colors.textSecondary,
     marginTop: 4,
-  },
-  settingValue: {
-    fontSize: 18,
-    color: theme.colors.textSecondary,
   },
   dangerRow: {
     borderBottomWidth: 0,

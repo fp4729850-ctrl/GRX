@@ -34,6 +34,16 @@ export const getBalance = async (address, networkKey, isTestnet = false) => {
     const balance = await provider.getBalance(address);
     return balance;
   } catch (error) {
+    // Check for rate limiting (Too Many Requests from Infura)
+    if (
+      error.code === 'BAD_DATA' &&
+      (error.message?.includes('Too Many Requests') || 
+       error.info?.value?.some?.(err => err.message?.includes('Too Many Requests')))
+    ) {
+      console.warn('Rate limit exceeded, returning zero balance (using demo data)');
+      return 0n;
+    }
+    
     console.error('Error fetching balance:', error);
     // Return zero balance on network errors instead of throwing
     if (error.code === 'NETWORK_ERROR' || error.message?.includes('Failed to fetch') || error.message?.includes('ERR_NAME_NOT_RESOLVED')) {
@@ -82,6 +92,16 @@ export const getTokenBalance = async (address, networkKey, isTestnet = false) =>
     
     return { balance, decimals };
   } catch (error) {
+    // Check for rate limiting (Too Many Requests from Infura)
+    if (
+      error.code === 'BAD_DATA' &&
+      (error.message?.includes('Too Many Requests') || 
+       error.info?.value?.some?.(err => err.message?.includes('Too Many Requests')))
+    ) {
+      console.warn('Rate limit exceeded, returning zero balance (using demo data)');
+      return { balance: 0n, decimals: 6 };
+    }
+    
     console.error('Error fetching token balance:', error);
     // Return zero balance on errors (network issues, contract not found, etc.)
     if (

@@ -50,9 +50,10 @@ export const useGrxPricing = (): UseGrxPricingResult => {
 
   useEffect(() => {
     load();
-    refreshRef.current = setInterval(() => {
-      load({ forceRefresh: true });
-    }, REFRESH_INTERVAL);
+    // DISABLED: Automatic polling causes too many API calls
+    // refreshRef.current = setInterval(() => {
+    //   load({ forceRefresh: true });
+    // }, REFRESH_INTERVAL);
 
     return () => {
       if (refreshRef.current) {

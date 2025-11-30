@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import {
   View,
   Text,
@@ -8,11 +8,23 @@ import {
   Linking,
   ActivityIndicator,
 } from "react-native";
+import { Ionicons, MaterialIcons } from "@expo/vector-icons";
 import { useRoute } from "@react-navigation/native";
-import { fetchBackendInvoiceDetail } from "../services/backendInvoiceService";
+import {
+  fetchBackendInvoiceDetail,
+  fetchPayoutStatus,
+} from "../services/backendInvoiceService";
 import { getInvoices } from "../services/invoiceService";
 import { theme } from "../styles/theme";
 import { NETWORKS } from "../utils/constants";
+
+// Gold color constants
+const GOLD_COLORS = {
+  primary: "#D4AF37",
+  light: "#F4E4BC",
+  dark: "#B8941F",
+  accent: "#FFD700",
+};
 
 const statusColor = (status) => {
   switch ((status || "").toUpperCase()) {
@@ -38,6 +50,8 @@ const InvoiceDetailScreen = () => {
   const [invoice, setInvoice] = useState(initialInvoice || null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [payoutStatus, setPayoutStatus] = useState(null);
+  const pollingIntervalRef = useRef(null);
 
   const explorerUrl =
     invoice?.txHash &&
@@ -69,9 +83,30 @@ const InvoiceDetailScreen = () => {
     }
   }, [invoiceId, invoice?.id]);
 
+  const loadPayoutStatus = useCallback(async () => {
+    const id = invoiceId || invoice?.id;
+    if (!id) return;
+    
+    const status = await fetchPayoutStatus(id);
+    setPayoutStatus(status);
+  }, [invoiceId, invoice?.id]);
+
   useEffect(() => {
     loadDetail();
-  }, [loadDetail]);
+    loadPayoutStatus();
+    
+    // DISABLED: Polling causes too many API calls
+    // Poll for payout status updates every 10 seconds
+    // pollingIntervalRef.current = setInterval(() => {
+    //   loadPayoutStatus();
+    // }, 10000);
+    
+    return () => {
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+      }
+    };
+  }, [loadDetail, loadPayoutStatus]);
 
   if (!invoice) {
     return (
@@ -84,7 +119,10 @@ const InvoiceDetailScreen = () => {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.card}>
-        <Text style={styles.cardLabel}>Invoice</Text>
+        <View style={styles.cardHeader}>
+          <MaterialIcons name="description" size={24} color={GOLD_COLORS.primary} />
+          <Text style={styles.cardLabel}>Invoice</Text>
+        </View>
         <Text style={styles.cardValue}>{invoice.id}</Text>
         <Text style={styles.subtitle}>Burned {invoice.amount} GRX</Text>
 
@@ -135,13 +173,48 @@ const InvoiceDetailScreen = () => {
             style={styles.explorerButton}
             onPress={() => Linking.openURL(explorerUrl)}
           >
-            <Text style={styles.explorerText}>View on Explorer</Text>
+            <Ionicons name="open-outline" size={18} color={GOLD_COLORS.primary} />
+            <Text style={styles.explorerText}> View on Explorer</Text>
           </TouchableOpacity>
         )}
       </View>
 
+      {payoutStatus && (
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <MaterialIcons name="payment" size={24} color={GOLD_COLORS.primary} />
+            <Text style={styles.cardLabel}>Payout Confirmation</Text>
+          </View>
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Payout Amount</Text>
+            <Text style={styles.detailValue}>
+              {payoutStatus.payoutAmount} {payoutStatus.payoutCurrency}
+            </Text>
+          </View>
+          {payoutStatus.partnerId && (
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Partner ID</Text>
+              <Text style={styles.detailValue}>{payoutStatus.partnerId}</Text>
+            </View>
+          )}
+          {(payoutStatus.payoutTx || payoutStatus.confirmationCode) && (
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>
+                {payoutStatus.payoutTx ? "Transaction Hash" : "Confirmation Code"}
+              </Text>
+              <Text style={[styles.detailValue, styles.confirmationCode]}>
+                {payoutStatus.payoutTx || payoutStatus.confirmationCode}
+              </Text>
+            </View>
+          )}
+        </View>
+      )}
+
       <View style={styles.card}>
-        <Text style={styles.cardLabel}>Timeline</Text>
+        <View style={styles.cardHeader}>
+          <MaterialIcons name="timeline" size={24} color={GOLD_COLORS.primary} />
+          <Text style={styles.cardLabel}>Timeline</Text>
+        </View>
         {loading && (
           <ActivityIndicator color={theme.colors.primary} style={styles.loader} />
         )}
@@ -194,9 +267,14 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.surface,
     borderRadius: theme.borderRadius.lg,
     padding: theme.spacing.lg,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderWidth: 1.5,
+    borderColor: GOLD_COLORS.light,
     ...theme.shadows.small,
+  },
+  cardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: theme.spacing.sm,
   },
   cardLabel: {
     fontSize: 18,
@@ -249,11 +327,17 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   explorerButton: {
+    flexDirection: "row",
+    alignItems: "center",
     marginTop: theme.spacing.md,
     alignSelf: "flex-start",
+    backgroundColor: GOLD_COLORS.light,
+    paddingVertical: theme.spacing.xs,
+    paddingHorizontal: theme.spacing.sm,
+    borderRadius: theme.borderRadius.sm,
   },
   explorerText: {
-    color: theme.colors.primary,
+    color: GOLD_COLORS.dark,
     fontWeight: "600",
   },
   timelineRow: {
@@ -264,7 +348,7 @@ const styles = StyleSheet.create({
     width: 12,
     height: 12,
     borderRadius: 6,
-    backgroundColor: theme.colors.primary,
+    backgroundColor: GOLD_COLORS.primary,
     marginRight: theme.spacing.md,
     marginTop: 4,
   },
@@ -300,6 +384,10 @@ const styles = StyleSheet.create({
   },
   loader: {
     marginVertical: theme.spacing.md,
+  },
+  confirmationCode: {
+    fontFamily: "monospace",
+    fontSize: 12,
   },
 });
 

@@ -11,8 +11,20 @@ import {
   Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { ethers } from 'ethers';
 import { useWallet } from '../context/WalletContext';
+
+// Gold color constants
+const GOLD_COLORS = {
+  primary: '#D4AF37',
+  light: '#F4E4BC',
+  dark: '#B8941F',
+  accent: '#FFD700',
+};
+
+// Dummy data for testing
+const DUMMY_GRX_BALANCE = "1250.5000";
 import {
   sendTransaction,
   sendTokenTransaction,
@@ -349,7 +361,8 @@ const SendScreen = ({ navigation }) => {
     };
 
     fetchStatus();
-    payoutPollRef.current = setInterval(fetchStatus, 15000);
+      // DISABLED: Polling causes too many API calls
+      // payoutPollRef.current = setInterval(fetchStatus, 15000);
 
     return () => {
       isMounted = false;
@@ -466,7 +479,7 @@ const SendScreen = ({ navigation }) => {
       ? ethBalance 
       : tokenType === 'USDT' 
         ? usdtBalance 
-        : grxBalance || '0';
+        : grxBalance || DUMMY_GRX_BALANCE;
     if (parseFloat(amount) > parseFloat(balance)) {
       Alert.alert('Error', 'Insufficient balance');
       return;
@@ -602,7 +615,7 @@ const SendScreen = ({ navigation }) => {
       >
       <View style={styles.form}>
         
-        {/* <View
+        <View
           style={[
             styles.modeBanner,
             custodialMode ? styles.custodialBanner : styles.onchainBanner,
@@ -613,9 +626,9 @@ const SendScreen = ({ navigation }) => {
               ? 'Custodial wallet enabled · Requests are sent to the GRX backend team.'
               : 'On-chain mode · You will sign this transaction directly with your device.'}
           </Text>
-        </View> */}
+        </View>
 
-        {/* <View style={styles.inputGroup}>
+        <View style={styles.inputGroup}>
           <Text style={styles.label}>Token</Text>
           <View style={styles.tokenSelector}>
             <TouchableOpacity
@@ -667,7 +680,7 @@ const SendScreen = ({ navigation }) => {
               </Text>
             </TouchableOpacity>
           </View>
-        </View> */}
+        </View>
 
         <View style={styles.inputGroup}>
           <Text style={styles.label}>Recipient Address</Text>
@@ -761,7 +774,7 @@ const SendScreen = ({ navigation }) => {
               onSearchChange: setFromSearchTerm,
             })}
             <TouchableOpacity style={styles.swapButton} onPress={handleSwapCurrencies}>
-              <Text style={styles.swapButtonText}>⇄</Text>
+              <Ionicons name="swap-horizontal" size={20} color="#FFFFFF" />
             </TouchableOpacity>
             {renderCountryDropdown({
               type: 'To',
@@ -792,7 +805,7 @@ const SendScreen = ({ navigation }) => {
                   ? usdtBalance 
                   : grxBalanceLoading 
                     ? '...' 
-                    : grxBalance || '0'
+                    : grxBalance || DUMMY_GRX_BALANCE
             })
           </Text>
           <TextInput
@@ -815,7 +828,7 @@ const SendScreen = ({ navigation }) => {
               </Text>
               {pricingWarning && (
                 <View style={styles.warningRow}>
-                  <Text style={styles.warningIcon}>⚠️</Text>
+                  <Ionicons name="warning-outline" size={16} color={theme.colors.warning} />
                   <Text style={styles.warningText}>{pricingWarning}</Text>
                 </View>
               )}
@@ -964,10 +977,15 @@ const SendScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
+    height:'80vh',
     backgroundColor: theme.colors.background,
   },
   container: {
     flex: 1,
+    height:'80vh',
+    overflowY: 'auto',
+    scrollbarWidth: 'none',
+    msOverflowStyle: 'none',
     backgroundColor: theme.colors.background,
   },
   content: {
@@ -976,6 +994,10 @@ const styles = StyleSheet.create({
     flexGrow: 1,
   },
   form: {
+    height:'80vh',
+    overflowY: 'auto',
+    scrollbarWidth: 'none',
+    msOverflowStyle: 'none',
     gap: theme.spacing.lg,
     flexGrow: 1,
   },
@@ -1020,8 +1042,8 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.border,
   },
   tokenButtonActive: {
-    backgroundColor: theme.colors.primary,
-    borderColor: theme.colors.primary,
+    backgroundColor: GOLD_COLORS.primary,
+    borderColor: GOLD_COLORS.primary,
   },
   tokenButtonText: {
     fontSize: 16,
@@ -1037,14 +1059,16 @@ const styles = StyleSheet.create({
     borderRadius: theme.borderRadius.md,
     fontSize: 16,
     color: theme.colors.text,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderWidth: 1.5,
+    borderColor: GOLD_COLORS.light,
   },
   converterCard: {
     backgroundColor: theme.colors.surface,
     borderRadius: theme.borderRadius.lg,
     padding: theme.spacing.md,
     gap: theme.spacing.sm,
+    borderWidth: 1.5,
+    borderColor: GOLD_COLORS.light,
     ...theme.shadows.small,
   },
   converterTitle: {
@@ -1131,18 +1155,14 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   swapButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: theme.colors.primary,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: GOLD_COLORS.primary,
     justifyContent: 'center',
     alignItems: 'center',
     marginTop: 22,
-  },
-  swapButtonText: {
-    color: theme.colors.secondary,
-    fontSize: 18,
-    fontWeight: '700',
+    ...theme.shadows.small,
   },
   converterResult: {
     fontSize: 16,
@@ -1167,10 +1187,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginTop: theme.spacing.xs,
-  },
-  warningIcon: {
-    fontSize: 14,
-    marginRight: theme.spacing.xs,
   },
   warningText: {
     fontSize: 12,
@@ -1213,6 +1229,8 @@ const styles = StyleSheet.create({
     borderRadius: theme.borderRadius.lg,
     padding: theme.spacing.md,
     gap: theme.spacing.sm,
+    borderWidth: 1.5,
+    borderColor: GOLD_COLORS.light,
     ...theme.shadows.small,
   },
   payoutTitle: {
@@ -1271,6 +1289,8 @@ const styles = StyleSheet.create({
     borderRadius: theme.borderRadius.lg,
     padding: theme.spacing.md,
     marginBottom: theme.spacing.md,
+    borderWidth: 1.5,
+    borderColor: GOLD_COLORS.light,
     ...theme.shadows.small,
   },
   snapshotHeader: {
@@ -1378,7 +1398,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   sendButton: {
-    backgroundColor: theme.colors.primary,
+    backgroundColor: GOLD_COLORS.primary,
     paddingVertical: theme.spacing.md,
     borderRadius: theme.borderRadius.lg,
     alignItems: 'center',

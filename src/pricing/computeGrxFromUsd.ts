@@ -5,7 +5,10 @@ export interface ComputeGrxFromUsdParams {
   goldPerGramUSD: number;
   feePct: number;
   precision?: number;
-  fxRate?: number | null;
+  fxRates?: {
+    USD_INR?: number | null;
+    USD_AED?: number | null;
+  };
 }
 
 export interface ComputeGrxFromUsdResult {
@@ -14,7 +17,9 @@ export interface ComputeGrxFromUsdResult {
   finalGrams: number;
   amountWei: string;
   usdValue: number;
-  localFiatValue: number | null;
+  usdCovered: number;
+  inrValue: number | null;
+  aedValue: number | null;
 }
 
 const roundUp = (value: number, precision: number): number => {
@@ -27,7 +32,7 @@ export const computeGrxFromUsd = ({
   goldPerGramUSD,
   feePct,
   precision = 6,
-  fxRate,
+  fxRates,
 }: ComputeGrxFromUsdParams): ComputeGrxFromUsdResult => {
   if (!Number.isFinite(desiredUsd) || desiredUsd <= 0) {
     throw new Error('Desired USD must be a positive number');
@@ -37,13 +42,27 @@ export const computeGrxFromUsd = ({
     throw new Error('Gold price must be a positive number');
   }
 
+  // Core calculation: GRX = USD / goldPerGramUSD
   const gramsNeeded = desiredUsd / goldPerGramUSD;
+  
+  // Apply fee: GRX_final = GRX * (1 + feePct)
   const gramsWithFees = gramsNeeded * (1 + feePct);
+  
+  // Round up to precision
   const finalGrams = roundUp(gramsWithFees, precision);
   const finalGramsAsFixed = finalGrams.toFixed(precision);
   const amountWei = ethers.parseUnits(finalGramsAsFixed, 18).toString();
-  const localFiatValue = fxRate
-    ? Number((finalGrams * goldPerGramUSD * fxRate).toFixed(2))
+  
+  // Compute USD value covered by final grams
+  const usdCovered = finalGrams * goldPerGramUSD;
+  
+  // Local currency conversion using FX rates only (not local gold prices)
+  const inrValue = fxRates?.USD_INR && Number.isFinite(fxRates.USD_INR) && fxRates.USD_INR > 0
+    ? Number((usdCovered * fxRates.USD_INR).toFixed(2))
+    : null;
+  
+  const aedValue = fxRates?.USD_AED && Number.isFinite(fxRates.USD_AED) && fxRates.USD_AED > 0
+    ? Number((usdCovered * fxRates.USD_AED).toFixed(2))
     : null;
 
   return {
@@ -52,7 +71,9 @@ export const computeGrxFromUsd = ({
     finalGrams,
     amountWei,
     usdValue: desiredUsd,
-    localFiatValue,
+    usdCovered,
+    inrValue,
+    aedValue,
   };
 };
 

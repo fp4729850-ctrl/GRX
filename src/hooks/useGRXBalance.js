@@ -70,7 +70,9 @@ export const useGRXBalance = (address, networkKey = 'ETHEREUM', isTestnet = fals
       clearInterval(intervalRef.current);
     }
 
-    intervalRef.current = setInterval(fetchBalance, 3000);
+    // DISABLED: Polling causes too many API calls
+    // Only fetch on mount and when app comes to foreground
+    // intervalRef.current = setInterval(fetchBalance, 30000);
 
     return () => {
       if (intervalRef.current) {

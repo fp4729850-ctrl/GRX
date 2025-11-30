@@ -9,9 +9,18 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import * as LocalAuthentication from 'expo-local-authentication';
 import { getPINHash, getBiometricEnabled } from '../services/storageService';
 import { theme } from '../styles/theme';
+
+// Gold color constants
+const GOLD_COLORS = {
+  primary: '#D4AF37',
+  light: '#F4E4BC',
+  dark: '#B8941F',
+  accent: '#FFD700',
+};
 
 const isWeb = Platform.OS === 'web';
 
@@ -98,6 +107,9 @@ const UnlockScreen = ({ onUnlock }) => {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <View style={styles.content}>
+        <View style={styles.iconContainer}>
+          <MaterialIcons name="lock-outline" size={64} color={GOLD_COLORS.primary} />
+        </View>
         <Text style={styles.title}>GRX Wallet</Text>
         <Text style={styles.subtitle}>Enter PIN to unlock</Text>
 
@@ -128,6 +140,7 @@ const UnlockScreen = ({ onUnlock }) => {
             style={styles.biometricButton}
             onPress={handleBiometricAuth}
           >
+            <Ionicons name="finger-print" size={20} color={GOLD_COLORS.dark} />
             <Text style={styles.biometricButtonText}>
               Use Biometric Authentication
             </Text>
@@ -149,10 +162,19 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  iconContainer: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: GOLD_COLORS.light,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: theme.spacing.lg,
+  },
   title: {
     fontSize: 36,
     fontWeight: 'bold',
-    color: theme.colors.primary,
+    color: GOLD_COLORS.primary,
     marginBottom: theme.spacing.sm,
   },
   subtitle: {
@@ -180,21 +202,29 @@ const styles = StyleSheet.create({
     height: 16,
     borderRadius: 8,
     borderWidth: 2,
-    borderColor: theme.colors.primary,
+    borderColor: GOLD_COLORS.primary,
     backgroundColor: 'transparent',
   },
   dotFilled: {
-    backgroundColor: theme.colors.primary,
+    backgroundColor: GOLD_COLORS.primary,
   },
   biometricButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
     marginTop: theme.spacing.lg,
     paddingVertical: theme.spacing.md,
     paddingHorizontal: theme.spacing.xl,
+    backgroundColor: GOLD_COLORS.light,
+    borderRadius: theme.borderRadius.md,
+    borderWidth: 1.5,
+    borderColor: GOLD_COLORS.primary,
   },
   biometricButtonText: {
-    color: theme.colors.primary,
+    color: GOLD_COLORS.dark,
     fontSize: 16,
     fontWeight: '600',
+    marginLeft: theme.spacing.xs,
   },
 });
 

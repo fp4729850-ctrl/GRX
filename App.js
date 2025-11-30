@@ -1,13 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { AppState, Platform } from 'react-native';
+import { AppState, Platform, View, TouchableOpacity, Text } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { WalletProvider, useWallet } from './src/context/WalletContext';
 import { getWalletAddress, getAppLocked, setAppLocked } from './src/services/storageService';
 import { theme } from './src/styles/theme';
+
+// Gold color constants
+const GOLD_COLORS = {
+  primary: '#D4AF37',
+  light: '#F4E4BC',
+  dark: '#B8941F',
+  accent: '#FFD700',
+};
 
 // Polyfill Buffer for web
 if (Platform.OS === 'web') {
@@ -33,6 +41,8 @@ import InvoicesScreen from './src/screens/InvoicesScreen';
 import InvoiceDetailScreen from './src/screens/InvoiceDetailScreen';
 import MintScreen from './src/screens/MintScreen';
 import VaultScreen from './src/screens/VaultScreen';
+import OwnershipSwapScreen from './src/screens/OwnershipSwapScreen';
+import AdminPanelScreen from './src/screens/AdminPanelScreen';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -44,13 +54,14 @@ const iconMap = {
   Settings: { focused: 'settings', default: 'settings-outline', label: 'Settings' },
 };
 
+
 const MainTabs = () => {
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarHideOnKeyboard: !isWeb,
-        tabBarActiveTintColor: theme.colors.primary,
+        tabBarActiveTintColor: GOLD_COLORS.primary,
         tabBarInactiveTintColor: theme.colors.textSecondary,
         tabBarLabelStyle: {
           fontSize: 12,
@@ -64,22 +75,31 @@ const MainTabs = () => {
         },
         tabBarStyle: {
           backgroundColor: theme.colors.surface,
-          borderTopWidth: 0,
+          borderTopWidth: 2,
+          borderTopColor: GOLD_COLORS.light,
           marginHorizontal: 16,
           marginBottom: 16,
           borderRadius: 24,
           height: 70,
           paddingBottom: 10,
           paddingTop: 10,
-          shadowColor: '#000',
-          shadowOpacity: 0.2,
+          shadowColor: GOLD_COLORS.primary,
+          shadowOpacity: 0.3,
           shadowRadius: 12,
           elevation: 12,
         },
-        tabBarIcon: ({ color, focused }) => {
+        tabBarIcon: ({ color, focused, size }) => {
           const icons = iconMap[route.name];
           const iconName = focused ? icons?.focused : icons?.default;
-          return <Ionicons name={iconName || 'ellipse'} size={22} color={color} />;
+          return (
+            <View style={{
+              backgroundColor: focused ? GOLD_COLORS.light : 'transparent',
+              padding: 8,
+              borderRadius: 12,
+            }}>
+              <Ionicons name={iconName || 'ellipse'} size={focused ? 24 : 22} color={color} />
+            </View>
+          );
         },
       })}
     >
@@ -159,11 +179,20 @@ const RootNavigator = () => {
       <Stack.Navigator
         screenOptions={{
           headerStyle: {
-            backgroundColor: '#2196F3',
+            backgroundColor: GOLD_COLORS.primary,
+            borderBottomWidth: 2,
+            borderBottomColor: GOLD_COLORS.dark,
+            elevation: 0,
+            shadowOpacity: 0,
           },
           headerTintColor: '#FFFFFF',
           headerTitleStyle: {
-            fontWeight: 'bold',
+            fontWeight: '700',
+            fontSize: 18,
+          },
+          headerBackTitleVisible: false,
+          headerLeftContainerStyle: {
+            paddingLeft: Platform.OS === 'ios' ? 8 : 0,
           },
         }}
       >
@@ -236,6 +265,16 @@ const RootNavigator = () => {
               name="InvoiceDetail" 
               component={InvoiceDetailScreen}
               options={{ title: 'Invoice Details' }}
+            />
+            <Stack.Screen 
+              name="OwnershipSwap" 
+              component={OwnershipSwapScreen}
+              options={{ title: 'Ownership Swapping' }}
+            />
+            <Stack.Screen 
+              name="AdminPanel" 
+              component={AdminPanelScreen}
+              options={{ title: 'Admin Panel', headerShown: false }}
             />
           </>
         )}

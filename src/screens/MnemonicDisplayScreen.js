@@ -8,8 +8,17 @@ import {
   Alert,
   Clipboard,
 } from 'react-native';
+import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import MnemonicGrid from '../components/MnemonicGrid';
 import { theme } from '../styles/theme';
+
+// Gold color constants
+const GOLD_COLORS = {
+  primary: '#D4AF37',
+  light: '#F4E4BC',
+  dark: '#B8941F',
+  accent: '#FFD700',
+};
 
 const MnemonicDisplayScreen = ({ route, navigation }) => {
   const { mnemonic } = route.params;
@@ -35,7 +44,10 @@ const MnemonicDisplayScreen = ({ route, navigation }) => {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.warningBox}>
-        <Text style={styles.warningTitle}>⚠️ Important Security Warning</Text>
+        <View style={styles.warningHeader}>
+          <MaterialIcons name="security" size={24} color={theme.colors.error} />
+          <Text style={styles.warningTitle}> Important Security Warning</Text>
+        </View>
         <Text style={styles.warningText}>
           Write down these 12 words in the exact order shown. Store them in a
           safe place. Anyone with access to these words can control your wallet.
@@ -45,7 +57,8 @@ const MnemonicDisplayScreen = ({ route, navigation }) => {
       <MnemonicGrid words={words} />
 
       <TouchableOpacity style={styles.copyButton} onPress={handleCopy}>
-        <Text style={styles.copyButtonText}>Copy to Clipboard</Text>
+        <Ionicons name="copy-outline" size={18} color={GOLD_COLORS.primary} />
+        <Text style={styles.copyButtonText}> Copy to Clipboard</Text>
       </TouchableOpacity>
 
       <View style={styles.checkboxContainer}>
@@ -59,7 +72,7 @@ const MnemonicDisplayScreen = ({ route, navigation }) => {
               isBackedUp && styles.checkboxChecked,
             ]}
           >
-            {isBackedUp && <Text style={styles.checkmark}>✓</Text>}
+            {isBackedUp && <Ionicons name="checkmark" size={16} color="#FFFFFF" />}
           </View>
           <Text style={styles.checkboxLabel}>
             I have backed up my recovery phrase
@@ -91,14 +104,18 @@ const styles = StyleSheet.create({
     padding: theme.spacing.md,
     borderRadius: theme.borderRadius.md,
     marginBottom: theme.spacing.lg,
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: theme.colors.error,
+  },
+  warningHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: theme.spacing.xs,
   },
   warningTitle: {
     fontSize: 16,
     fontWeight: 'bold',
     color: theme.colors.error,
-    marginBottom: theme.spacing.xs,
   },
   warningText: {
     fontSize: 14,
@@ -106,18 +123,20 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   copyButton: {
-    backgroundColor: theme.colors.surface,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: GOLD_COLORS.light,
     paddingVertical: theme.spacing.sm,
     paddingHorizontal: theme.spacing.md,
     borderRadius: theme.borderRadius.md,
-    alignItems: 'center',
     marginTop: theme.spacing.lg,
     marginBottom: theme.spacing.md,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderWidth: 1.5,
+    borderColor: GOLD_COLORS.primary,
   },
   copyButtonText: {
-    color: theme.colors.primary,
+    color: GOLD_COLORS.dark,
     fontSize: 16,
     fontWeight: '600',
   },
@@ -132,19 +151,14 @@ const styles = StyleSheet.create({
     width: 24,
     height: 24,
     borderWidth: 2,
-    borderColor: theme.colors.primary,
+    borderColor: GOLD_COLORS.primary,
     borderRadius: 4,
     marginRight: theme.spacing.sm,
     alignItems: 'center',
     justifyContent: 'center',
   },
   checkboxChecked: {
-    backgroundColor: theme.colors.primary,
-  },
-  checkmark: {
-    color: theme.colors.secondary,
-    fontSize: 16,
-    fontWeight: 'bold',
+    backgroundColor: GOLD_COLORS.primary,
   },
   checkboxLabel: {
     fontSize: 16,
@@ -152,7 +166,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   button: {
-    backgroundColor: theme.colors.primary,
+    backgroundColor: GOLD_COLORS.primary,
     paddingVertical: theme.spacing.md,
     paddingHorizontal: theme.spacing.lg,
     borderRadius: theme.borderRadius.lg,
@@ -171,4 +185,3 @@ const styles = StyleSheet.create({
 });
 
 export default MnemonicDisplayScreen;
-

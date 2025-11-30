@@ -8,6 +8,7 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
+import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { deriveWalletFromMnemonic } from '../services/walletService';
 import {
   storeMnemonic,
@@ -16,6 +17,14 @@ import {
 } from '../services/storageService';
 import { useWallet } from '../context/WalletContext';
 import { theme } from '../styles/theme';
+
+// Gold color constants
+const GOLD_COLORS = {
+  primary: '#D4AF37',
+  light: '#F4E4BC',
+  dark: '#B8941F',
+  accent: '#FFD700',
+};
 
 const MnemonicConfirmScreen = ({ route, navigation }) => {
   const { mnemonic } = route.params;
@@ -119,15 +128,19 @@ const MnemonicConfirmScreen = ({ route, navigation }) => {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={styles.title}>Confirm Your Recovery Phrase</Text>
+      <View style={styles.header}>
+        <MaterialIcons name="verified-user" size={32} color={GOLD_COLORS.primary} />
+        <Text style={styles.title}>Confirm Your Recovery Phrase</Text>
+      </View>
       <Text style={styles.description}>
         Select the words in the correct order to confirm you've saved your recovery phrase.
       </Text>
 
       {/* Current step indicator */}
       <View style={styles.stepIndicator}>
+        <Ionicons name="checkmark-circle" size={20} color="#FFFFFF" />
         <Text style={styles.stepText}>
-          Select word {currentStep} of 12
+          {' '}Select word {currentStep} of 12
         </Text>
       </View>
 
@@ -146,7 +159,7 @@ const MnemonicConfirmScreen = ({ route, navigation }) => {
                   <Text style={styles.selectedWordText}>
                     {selectedWords[index]}
                   </Text>
-                  <Text style={styles.removeIcon}>×</Text>
+                  <Ionicons name="close-circle" size={18} color="#FFFFFF" />
                 </TouchableOpacity>
               ) : (
                 <View style={styles.emptyWordSlot}>
@@ -201,7 +214,8 @@ const MnemonicConfirmScreen = ({ route, navigation }) => {
             setCurrentStep(1);
           }}
         >
-          <Text style={styles.resetButtonText}>Reset</Text>
+          <Ionicons name="refresh-outline" size={18} color={theme.colors.textSecondary} />
+          <Text style={styles.resetButtonText}> Reset</Text>
         </TouchableOpacity>
       )}
     </ScrollView>
@@ -216,11 +230,15 @@ const styles = StyleSheet.create({
   content: {
     padding: theme.spacing.lg,
   },
+  header: {
+    alignItems: 'center',
+    marginBottom: theme.spacing.sm,
+  },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
     color: theme.colors.text,
-    marginBottom: theme.spacing.sm,
+    marginTop: theme.spacing.sm,
     textAlign: 'center',
   },
   description: {
@@ -231,11 +249,13 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   stepIndicator: {
-    backgroundColor: theme.colors.primary,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: GOLD_COLORS.primary,
     padding: theme.spacing.md,
     borderRadius: theme.borderRadius.md,
     marginBottom: theme.spacing.lg,
-    alignItems: 'center',
+    justifyContent: 'center',
   },
   stepText: {
     color: theme.colors.secondary,
@@ -247,6 +267,8 @@ const styles = StyleSheet.create({
     padding: theme.spacing.md,
     borderRadius: theme.borderRadius.md,
     marginBottom: theme.spacing.lg,
+    borderWidth: 1.5,
+    borderColor: GOLD_COLORS.light,
     ...theme.shadows.small,
   },
   selectedLabel: {
@@ -275,7 +297,7 @@ const styles = StyleSheet.create({
   },
   selectedWordChip: {
     flex: 1,
-    backgroundColor: theme.colors.primary,
+    backgroundColor: GOLD_COLORS.primary,
     paddingVertical: theme.spacing.xs,
     paddingHorizontal: theme.spacing.sm,
     borderRadius: theme.borderRadius.sm,
@@ -289,20 +311,14 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     flex: 1,
   },
-  removeIcon: {
-    color: theme.colors.secondary,
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginLeft: theme.spacing.xs,
-  },
   emptyWordSlot: {
     flex: 1,
     backgroundColor: theme.colors.background,
     paddingVertical: theme.spacing.xs,
     paddingHorizontal: theme.spacing.sm,
     borderRadius: theme.borderRadius.sm,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderWidth: 1.5,
+    borderColor: GOLD_COLORS.light,
     borderStyle: 'dashed',
     alignItems: 'center',
     justifyContent: 'center',
@@ -331,8 +347,8 @@ const styles = StyleSheet.create({
     paddingVertical: theme.spacing.sm,
     paddingHorizontal: theme.spacing.md,
     borderRadius: theme.borderRadius.md,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderWidth: 1.5,
+    borderColor: GOLD_COLORS.light,
     ...theme.shadows.small,
   },
   wordButtonText: {
@@ -341,7 +357,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   button: {
-    backgroundColor: theme.colors.primary,
+    backgroundColor: GOLD_COLORS.primary,
     paddingVertical: theme.spacing.md,
     paddingHorizontal: theme.spacing.lg,
     borderRadius: theme.borderRadius.lg,
@@ -358,8 +374,10 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   resetButton: {
-    paddingVertical: theme.spacing.sm,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: theme.spacing.sm,
     marginTop: theme.spacing.md,
   },
   resetButtonText: {

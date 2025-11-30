@@ -9,9 +9,18 @@ import {
   ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import QRCode from 'react-native-qrcode-svg';
 import { useWallet } from '../context/WalletContext';
 import { theme } from '../styles/theme';
+
+// Gold color constants
+const GOLD_COLORS = {
+  primary: '#D4AF37',
+  light: '#F4E4BC',
+  dark: '#B8941F',
+  accent: '#FFD700',
+};
 
 const ReceiveScreen = () => {
   const { walletAddress } = useWallet();
@@ -45,7 +54,10 @@ const ReceiveScreen = () => {
             </View>
 
             <View style={styles.addressContainer}>
-              <Text style={styles.addressLabel}>Your Wallet Address</Text>
+              <View style={styles.addressHeader}>
+                <MaterialIcons name="account-balance-wallet" size={20} color={GOLD_COLORS.primary} />
+                <Text style={styles.addressLabel}>Your Wallet Address</Text>
+              </View>
               <Text style={styles.addressText} selectable>
                 {walletAddress}
               </Text>
@@ -55,12 +67,17 @@ const ReceiveScreen = () => {
               style={styles.copyButton}
               onPress={handleCopyAddress}
             >
-              <Text style={styles.copyButtonText}>Copy Address</Text>
+              <Ionicons name="copy-outline" size={20} color="#FFFFFF" />
+              <Text style={styles.copyButtonText}> Copy Address</Text>
             </TouchableOpacity>
 
             <View style={styles.warningBox}>
+              <View style={styles.warningHeader}>
+                <Ionicons name="warning-outline" size={20} color="#856404" />
+                <Text style={styles.warningTitle}> Important Notice</Text>
+              </View>
               <Text style={styles.warningText}>
-                ⚠️ Only send {walletAddress ? 'tokens' : ''} to this address.
+                Only send {walletAddress ? 'tokens' : ''} to this address.
                 Sending other assets may result in permanent loss.
               </Text>
             </View>
@@ -102,6 +119,8 @@ const styles = StyleSheet.create({
     padding: theme.spacing.lg,
     borderRadius: theme.borderRadius.lg,
     marginBottom: theme.spacing.xl,
+    borderWidth: 2,
+    borderColor: GOLD_COLORS.primary,
     ...theme.shadows.medium,
   },
   addressContainer: {
@@ -110,12 +129,20 @@ const styles = StyleSheet.create({
     borderRadius: theme.borderRadius.md,
     width: '100%',
     marginBottom: theme.spacing.md,
+    borderWidth: 1.5,
+    borderColor: GOLD_COLORS.light,
     ...theme.shadows.small,
+  },
+  addressHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: theme.spacing.xs,
   },
   addressLabel: {
     fontSize: 14,
     color: theme.colors.textSecondary,
-    marginBottom: theme.spacing.xs,
+    marginLeft: theme.spacing.xs,
+    fontWeight: '600',
   },
   addressText: {
     fontSize: 14,
@@ -124,12 +151,14 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   copyButton: {
-    backgroundColor: theme.colors.primary,
+    backgroundColor: GOLD_COLORS.primary,
     paddingVertical: theme.spacing.md,
     paddingHorizontal: theme.spacing.xl,
     borderRadius: theme.borderRadius.lg,
     width: '100%',
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: theme.spacing.lg,
     ...theme.shadows.medium,
   },
@@ -143,8 +172,19 @@ const styles = StyleSheet.create({
     padding: theme.spacing.md,
     borderRadius: theme.borderRadius.md,
     width: '100%',
-    borderWidth: 1,
-    borderColor: '#FFC107',
+    borderWidth: 1.5,
+    borderColor: GOLD_COLORS.primary,
+  },
+  warningHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: theme.spacing.xs,
+    justifyContent: 'center',
+  },
+  warningTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#856404',
   },
   warningText: {
     fontSize: 14,

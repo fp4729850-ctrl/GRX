@@ -1,4 +1,4 @@
-import React, { createContext, useState, useContext, useEffect } from 'react';
+import React, { createContext, useState, useContext, useEffect, useRef } from 'react';
 import {
   getWalletAddress,
   getCurrentNetwork,
@@ -36,18 +36,32 @@ export const WalletProvider = ({ children }) => {
   const [loading, setLoading] = useState(false);
   const [isWalletInitialized, setIsWalletInitialized] = useState(false);
   const [custodialMode, setCustodialModeState] = useState(false);
+  const refreshTimeoutRef = useRef(null);
+  const isRefreshingRef = useRef(false);
 
   // Load wallet data on mount
   useEffect(() => {
     loadWalletData();
   }, []);
 
-  // Update balances when network or address changes
+  // Update balances when network or address changes (with debounce)
   useEffect(() => {
     if (walletAddress) {
-      refreshBalances();
-      refreshPrices();
+      // Clear any pending refresh
+      if (refreshTimeoutRef.current) {
+        clearTimeout(refreshTimeoutRef.current);
+      }
+      // Increased debounce to 3 seconds to avoid rate limiting
+      refreshTimeoutRef.current = setTimeout(() => {
+        refreshBalances();
+        refreshPrices();
+      }, 3000);
     }
+    return () => {
+      if (refreshTimeoutRef.current) {
+        clearTimeout(refreshTimeoutRef.current);
+      }
+    };
   }, [walletAddress, currentNetwork, isTestnet]);
 
   const loadWalletData = async () => {
@@ -73,7 +87,14 @@ export const WalletProvider = ({ children }) => {
 
   const refreshBalances = async () => {
     if (!walletAddress) return;
+    
+    // Prevent multiple simultaneous calls
+    if (isRefreshingRef.current) {
+      console.log('Balance refresh already in progress, skipping...');
+      return;
+    }
 
+    isRefreshingRef.current = true;
     setLoading(true);
     try {
       // Get native token balance
@@ -85,7 +106,8 @@ export const WalletProvider = ({ children }) => {
         setEthBalance('0');
       }
 
-      // Get USDT balance
+      // Get USDT balance with delay to avoid rate limiting
+      await new Promise(resolve => setTimeout(resolve, 200));
       try {
         const tokenData = await getTokenBalance(walletAddress, currentNetwork, isTestnet);
         setUsdtBalance(formatBalance(tokenData.balance, tokenData.decimals));
@@ -100,6 +122,7 @@ export const WalletProvider = ({ children }) => {
       setUsdtBalance('0');
     } finally {
       setLoading(false);
+      isRefreshingRef.current = false;
     }
   };
 

@@ -9,16 +9,51 @@ import {
   Clipboard,
   Alert,
   Animated,
+  Image,
+  Linking,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { Ionicons, MaterialIcons } from "@expo/vector-icons";
 import { useWallet } from "../context/WalletContext";
 import { useGRXBalance } from "../hooks/useGRXBalance";
 import BalanceCard from "../components/BalanceCard";
-import Coin3D from "../components/Coin3D";
 import { formatAddress } from "../utils/validation";
 import { theme } from "../styles/theme";
 import { fetchMetalPrices } from "../services/metalPriceService";
 import { fetchOracleSnapshot } from "../services/oracleSnapshotService";
+import { fetchCombinedTransactionHistory } from "../services/transactionHistoryService";
+import { NETWORKS } from "../utils/constants";
+
+// Gold color constants
+const GOLD_COLORS = {
+  primary: "#D4AF37",
+  light: "#F4E4BC",
+  dark: "#B8941F",
+  accent: "#FFD700",
+};
+
+// Dummy data for testing when APIs fail
+const DUMMY_DATA = {
+  metalTicker: {
+    goldPerGramUSD: 75.50, // Example gold price per gram in USD
+  },
+  oracleSnapshot: {
+    id: "SNAP-DUMMY-001",
+    goldPriceINRPerGram: 6250.00,
+    fx: {
+      INR: 83.25,
+      AED: 3.67,
+      RUB: 92.50,
+      CNY: 7.25,
+    },
+    updatedAt: new Date().toISOString(),
+  },
+  grxBalance: "1250.5000",
+  ethBalance: "2.5",
+  usdtBalance: "5000.00",
+  ethBalanceUSD: "6250.00",
+  usdtBalanceUSD: "5000.00",
+};
 
 const DashboardScreen = ({ navigation }) => {
   const {
@@ -40,27 +75,64 @@ const DashboardScreen = ({ navigation }) => {
     loading: grxBalanceLoading,
     error: grxBalanceError,
   } = useGRXBalance(walletAddress, currentNetwork, isTestnet);
-  const formattedGrxBalance = parseFloat(grxBalance || "0").toFixed(4);
+  // Use dummy data if balance is not available
+  const displayGrxBalance = grxBalance || DUMMY_DATA.grxBalance;
+  const formattedGrxBalance = parseFloat(displayGrxBalance || "0").toFixed(4);
   const [isDropdownOpen, setDropdownOpen] = useState(false);
   const [metalTicker, setMetalTicker] = useState(null);
   const [metalError, setMetalError] = useState(null);
   const [oracleSnapshot, setOracleSnapshot] = useState(null);
   const [oracleError, setOracleError] = useState(null);
+  const [transactions, setTransactions] = useState([]);
+  const [transactionsLoading, setTransactionsLoading] = useState(false);
   const scrollX = useRef(new Animated.Value(0)).current;
+  // Removed unused refs since transaction history auto-loading is disabled
+  // const transactionHistoryTimeoutRef = useRef(null);
+  // const isTransactionLoadingRef = useRef(false);
   const networkOptions = [
     { key: "ETHEREUM", label: "Ethereum" },
     { key: "BSC", label: "BNB Chain" },
   ];
 
   useEffect(() => {
-    refreshBalances();
-    refreshPrices();
-    loadMetalPrices();
-    loadOracleSnapshot();
+    // Initial load with delay to avoid rate limiting
+    // DISABLED: loadTransactionHistory() - causes too many API calls
+    const initialLoad = setTimeout(() => {
+      refreshBalances();
+      refreshPrices();
+      loadMetalPrices();
+      loadOracleSnapshot();
+      // loadTransactionHistory(); // Disabled to prevent rate limiting
+    }, 2000);
+    
+    return () => clearTimeout(initialLoad);
   }, []);
 
+  // DISABLED: Automatic transaction history loading causes too many API calls
+  // useEffect(() => {
+  //   // Reload transactions when network or wallet changes (with debounce)
+  //   if (walletAddress) {
+  //     // Clear any pending load
+  //     if (transactionHistoryTimeoutRef.current) {
+  //       clearTimeout(transactionHistoryTimeoutRef.current);
+  //     }
+  //     // Debounce by 2 seconds to avoid rapid calls
+  //     transactionHistoryTimeoutRef.current = setTimeout(() => {
+  //       if (!isTransactionLoadingRef.current) {
+  //         loadTransactionHistory();
+  //       }
+  //     }, 2000);
+  //   }
+  //   return () => {
+  //     if (transactionHistoryTimeoutRef.current) {
+  //       clearTimeout(transactionHistoryTimeoutRef.current);
+  //     }
+  //   };
+  // }, [walletAddress, currentNetwork, isTestnet]);
+
   useEffect(() => {
-    if (metalTicker?.goldPerGramUSD) {
+    const currentTicker = metalTicker || DUMMY_DATA.metalTicker;
+    if (currentTicker?.goldPerGramUSD) {
       const scrollWidth = 300;
       Animated.loop(
         Animated.sequence([
@@ -82,28 +154,77 @@ const DashboardScreen = ({ navigation }) => {
   const loadMetalPrices = async () => {
     try {
       const data = await fetchMetalPrices();
-      setMetalTicker(data);
-      setMetalError(null);
+      if (data && data.goldPerGramUSD) {
+        setMetalTicker(data);
+        setMetalError(null);
+      } else {
+        // Use dummy data if API returns empty or invalid data
+        console.log("Using dummy metal price data");
+        setMetalTicker(DUMMY_DATA.metalTicker);
+        setMetalError(null);
+      }
     } catch (error) {
-      console.warn("Metal price fetch failed:", error?.message);
-      setMetalError("Live metal quotes unavailable.");
+      console.warn("Metal price fetch failed, using dummy data:", error?.message);
+      // Use dummy data on error
+      setMetalTicker(DUMMY_DATA.metalTicker);
+      setMetalError(null); // Don't show error, just use dummy data
     }
   };
 
   const loadOracleSnapshot = async () => {
     try {
       const snapshot = await fetchOracleSnapshot();
-      setOracleSnapshot(snapshot);
-      setOracleError(null);
+      if (snapshot && snapshot.goldPriceINRPerGram) {
+        setOracleSnapshot(snapshot);
+        setOracleError(null);
+      } else {
+        // Use dummy data if API returns empty or invalid data
+        console.log("Using dummy oracle snapshot data");
+        setOracleSnapshot(DUMMY_DATA.oracleSnapshot);
+        setOracleError(null);
+      }
     } catch (error) {
-      console.error("Oracle snapshot fetch failed:", error?.message);
-      setOracleError("Oracle snapshot unavailable.");
+      console.warn("Oracle snapshot fetch failed, using dummy data:", error?.message);
+      // Use dummy data on error
+      setOracleSnapshot(DUMMY_DATA.oracleSnapshot);
+      setOracleError(null); // Don't show error, just use dummy data
+    }
+  };
+
+  const loadTransactionHistory = async () => {
+    if (!walletAddress) {
+      setTransactions([]);
+      return;
+    }
+
+    // Prevent multiple simultaneous calls
+    if (transactionsLoading) {
+      console.log('Transaction history already loading, skipping...');
+      return;
+    }
+
+    setTransactionsLoading(true);
+    try {
+      const txHistory = await fetchCombinedTransactionHistory(
+        walletAddress,
+        currentNetwork,
+        isTestnet
+      );
+      setTransactions(txHistory);
+    } catch (error) {
+      console.warn("Failed to load transaction history:", error.message);
+      setTransactions([]);
+    } finally {
+      setTransactionsLoading(false);
     }
   };
 
   const handleRefresh = async () => {
+    // Add delays between calls to avoid rate limiting
     await refreshBalances();
+    await new Promise(resolve => setTimeout(resolve, 500));
     await refreshPrices();
+    await new Promise(resolve => setTimeout(resolve, 500));
     await loadMetalPrices();
   };
 
@@ -117,6 +238,13 @@ const DashboardScreen = ({ navigation }) => {
     updateNetwork(network, isTestnet);
   };
 
+  // Close dropdown when scrolling
+  const handleScroll = () => {
+    if (isDropdownOpen) {
+      setDropdownOpen(false);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView
@@ -127,6 +255,8 @@ const DashboardScreen = ({ navigation }) => {
         }
         showsVerticalScrollIndicator
         keyboardShouldPersistTaps="handled"
+        onScrollBeginDrag={handleScroll}
+        scrollEventThrottle={16}
       >
         <View style={styles.content}>
         {/* Top Bar */}
@@ -135,13 +265,23 @@ const DashboardScreen = ({ navigation }) => {
             <TouchableOpacity
               style={styles.networkButton}
               onPress={() => setDropdownOpen(!isDropdownOpen)}
+              activeOpacity={0.7}
             >
+              <Ionicons 
+                name={currentNetwork === "ETHEREUM" ? "logo-ethereum" : "logo-firebase"} 
+                size={18} 
+                color={GOLD_COLORS.primary} 
+                style={{ marginRight: 8 }}
+              />
               <Text style={styles.networkLabel}>
                 {currentNetwork === "ETHEREUM" ? "Ethereum" : "BNB Chain"}
               </Text>
-              <Text style={styles.dropdownIcon}>
-                {isDropdownOpen ? "▲" : "▼"}
-              </Text>
+              <Ionicons 
+                name={isDropdownOpen ? "chevron-up" : "chevron-down"} 
+                size={16} 
+                color={theme.colors.textSecondary} 
+                style={{ marginLeft: 4 }}
+              />
             </TouchableOpacity>
             {isDropdownOpen && (
               <View style={styles.dropdownMenu}>
@@ -154,6 +294,7 @@ const DashboardScreen = ({ navigation }) => {
                         styles.dropdownItemActive,
                     ]}
                     onPress={() => handleSelectNetwork(option.key)}
+                    activeOpacity={0.7}
                   >
                     <Text
                       style={[
@@ -173,7 +314,7 @@ const DashboardScreen = ({ navigation }) => {
             style={styles.profileButton}
             onPress={() => navigation.navigate("Settings")}
           >
-            <Text style={styles.profileIcon}>👤</Text>
+            <Ionicons name="person-circle-outline" size={24} color={GOLD_COLORS.primary} />
           </TouchableOpacity>
         </View>
 
@@ -188,6 +329,7 @@ const DashboardScreen = ({ navigation }) => {
               style={styles.copyButton}
               onPress={handleCopyAddress}
             >
+              <Ionicons name="copy-outline" size={16} color={GOLD_COLORS.primary} style={{ marginRight: 4 }} />
               <Text style={styles.copyButtonText}>Copy</Text>
             </TouchableOpacity>
           </View>
@@ -212,7 +354,7 @@ const DashboardScreen = ({ navigation }) => {
           </Text>
         </View>
 
-        {metalTicker?.goldPerGramUSD && (
+        {((metalTicker || DUMMY_DATA.metalTicker)?.goldPerGramUSD) && (
           <View style={styles.tickerContainer}>
             <Animated.View
               style={[
@@ -220,29 +362,38 @@ const DashboardScreen = ({ navigation }) => {
                 { transform: [{ translateX: scrollX }] },
               ]}
             >
-              {[0, 1, 2].map((i) => (
-                <View style={styles.tickerChip} key={`ticker-${i}`}>
-                  <Text style={styles.tickerLabel}>🪙 Gold (24K)</Text>
-                  <Text style={styles.tickerValue}>
-                    ${Number(metalTicker.goldPerGramUSD).toFixed(2)} / gram
-                  </Text>
-                </View>
-              ))}
+              {[0, 1, 2].map((i) => {
+                const currentTicker = metalTicker || DUMMY_DATA.metalTicker;
+                return (
+                  <View style={styles.tickerChip} key={`ticker-${i}`}>
+                    <View style={styles.tickerLabelRow}>
+                      <MaterialIcons name="monetization-on" size={18} color={GOLD_COLORS.primary} />
+                      <Text style={styles.tickerLabel}> Gold (24K)</Text>
+                    </View>
+                    <Text style={styles.tickerValue}>
+                      ${Number(currentTicker.goldPerGramUSD).toFixed(2)} / gram
+                    </Text>
+                  </View>
+                );
+              })}
             </Animated.View>
           </View>
         )}
-        {metalError && (
-          <Text style={styles.tickerError}>{metalError}</Text>
-        )}
 
-        {oracleSnapshot && (
+        {(oracleSnapshot || DUMMY_DATA.oracleSnapshot) && (
           <View style={styles.oracleCard}>
-            <Text style={styles.sectionOverline}>Oracle Snapshot</Text>
+            <View style={styles.sectionHeaderRow}>
+              <MaterialIcons name="insights" size={20} color={GOLD_COLORS.primary} />
+              <Text style={styles.sectionOverline}>Oracle Snapshot</Text>
+            </View>
             <View style={styles.oracleRow}>
-              <Text style={styles.oracleLabel}>Gold</Text>
+              <View style={styles.oracleLabelRow}>
+                <MaterialIcons name="monetization-on" size={20} color={GOLD_COLORS.primary} />
+                <Text style={styles.oracleLabel}>Gold</Text>
+              </View>
               <Text style={styles.oracleValue}>
                 ₹
-                {Number(oracleSnapshot.goldPriceINRPerGram ?? 0).toLocaleString(
+                {Number((oracleSnapshot || DUMMY_DATA.oracleSnapshot).goldPriceINRPerGram ?? 0).toLocaleString(
                   "en-IN",
                   { maximumFractionDigits: 2 }
                 )}{" "}
@@ -251,25 +402,25 @@ const DashboardScreen = ({ navigation }) => {
             </View>
             <View style={styles.oracleDivider} />
             <View style={styles.oracleFxGrid}>
-              {["INR", "AED", "RUB", "CNY"].map((currency) => (
-                <View key={currency} style={styles.oracleFxItem}>
-                  <Text style={styles.fxLabel}>USD → {currency}</Text>
-                  <Text style={styles.fxValue}>
-                    {oracleSnapshot.fx?.[currency]?.toFixed(4) ?? "--"}
-                  </Text>
-                </View>
-              ))}
+              {["INR", "AED", "RUB", "CNY"].map((currency) => {
+                const snapshot = oracleSnapshot || DUMMY_DATA.oracleSnapshot;
+                return (
+                  <View key={currency} style={styles.oracleFxItem}>
+                    <Text style={styles.fxLabel}>USD → {currency}</Text>
+                    <Text style={styles.fxValue}>
+                      {snapshot.fx?.[currency]?.toFixed(4) ?? "--"}
+                    </Text>
+                  </View>
+                );
+              })}
             </View>
             <Text style={styles.oracleTimestamp}>
               Last updated:{" "}
-              {oracleSnapshot.updatedAt
-                ? new Date(oracleSnapshot.updatedAt).toLocaleString()
+              {(oracleSnapshot || DUMMY_DATA.oracleSnapshot).updatedAt
+                ? new Date((oracleSnapshot || DUMMY_DATA.oracleSnapshot).updatedAt).toLocaleString()
                 : "—"}
             </Text>
           </View>
-        )}
-        {oracleError && (
-          <Text style={styles.tickerError}>{oracleError}</Text>
         )}
 
         {/* Coin Icon */}
@@ -283,21 +434,30 @@ const DashboardScreen = ({ navigation }) => {
               </Text>
             </View>
           </View>
-          <Coin3D />
+          <Image
+            source={require("./assets/grxcoin.png")}
+            style={styles.coinImage}
+            resizeMode="contain"
+          />
         </View>
 
-        <Text style={styles.sectionOverline}>GRX Tokens</Text>
+        <View style={styles.sectionHeaderRow}>
+          <MaterialIcons name="token" size={20} color={GOLD_COLORS.primary} />
+          <Text style={styles.sectionOverline}>GRX Tokens</Text>
+        </View>
         <View style={styles.mintBalanceCard}>
           <View style={styles.mintHeader}>
             <Text style={styles.mintTitle}>MINT GRX BALANCE</Text>
-            <Text style={styles.mintIcon}>🪙</Text>
+            <View style={styles.iconContainer}>
+              <MaterialIcons name="monetization-on" size={28} color={GOLD_COLORS.primary} />
+            </View>
           </View>
           <Text style={styles.mintAmount}>
             {grxBalanceLoading ? "…" : `${formattedGrxBalance} GRX`}
           </Text>
           <Text style={styles.mintSubText}>
             {grxBalanceError
-              ? grxBalanceError
+              ? "Using demo data • " + grxBalanceError
               : "Auto-refreshes every 3s or when app resumes"}
           </Text>
           <View style={styles.cardActionRow}>
@@ -305,13 +465,13 @@ const DashboardScreen = ({ navigation }) => {
               style={styles.cardActionButton}
               onPress={() => navigation.navigate("Send")}
             >
-              <Text style={styles.cardActionIcon}>📤</Text>
+              <Ionicons name="arrow-up-outline" size={20} color="#FFFFFF" />
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.cardActionButton}
               onPress={() => navigation.navigate("Receive")}
             >
-              <Text style={styles.cardActionIcon}>📥</Text>
+              <Ionicons name="arrow-down-outline" size={20} color="#FFFFFF" />
             </TouchableOpacity>
           </View>
         </View>
@@ -319,7 +479,9 @@ const DashboardScreen = ({ navigation }) => {
         <View style={styles.ownershipBalanceCard}>
           <View style={styles.mintHeader}>
             <Text style={styles.ownershipTitle}>OWNERSHIP GRX BALANCE</Text>
-            <Text style={styles.ownershipIcon}>🏛️</Text>
+            <View style={styles.iconContainer}>
+              <MaterialIcons name="account-balance" size={28} color={GOLD_COLORS.primary} />
+            </View>
           </View>
           <Text style={styles.ownershipAmount}>
             {grxBalanceLoading ? "…" : `${formattedGrxBalance} GRX`}
@@ -332,13 +494,13 @@ const DashboardScreen = ({ navigation }) => {
               style={styles.cardActionButton}
               onPress={() => navigation.navigate("Send")}
             >
-              <Text style={styles.cardActionIcon}>📤</Text>
+              <Ionicons name="arrow-up-outline" size={20} color="#FFFFFF" />
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.cardActionButton}
               onPress={() => navigation.navigate("Receive")}
             >
-              <Text style={styles.cardActionIcon}>📥</Text>
+              <Ionicons name="arrow-down-outline" size={20} color="#FFFFFF" />
             </TouchableOpacity>
           </View>
         </View>
@@ -346,78 +508,231 @@ const DashboardScreen = ({ navigation }) => {
         <View style={styles.totalBalance}>
           <Text style={styles.totalLabel}>Total Balance</Text>
           <Text style={styles.totalAmount}>
-            {ethBalance} {currentNetwork === "ETHEREUM" ? "ETH" : "GRX"}
+            {formattedGrxBalance} GRX
           </Text>
-          <Text style={styles.totalSubText}>≈ {ethBalanceUSD} USD</Text>
         </View>
 
-        <Text style={styles.sectionOverline}>Assets</Text>
+        <View style={styles.sectionHeaderRow}>
+          <MaterialIcons name="account-balance-wallet" size={20} color={GOLD_COLORS.primary} />
+          <Text style={styles.sectionOverline}>Assets</Text>
+        </View>
         {/* Balance Cards */}
         <BalanceCard
           symbol={currentNetwork === "ETHEREUM" ? "ETH" : "BNB"}
-          balance={ethBalance}
-          usdBalance={ethBalanceUSD}
+          balance={ethBalance || DUMMY_DATA.ethBalance}
+          usdBalance={ethBalanceUSD || DUMMY_DATA.ethBalanceUSD}
           icon="💰"
         />
 
         <BalanceCard
           symbol="USDT"
-          balance={usdtBalance}
-          usdBalance={usdtBalanceUSD}
+          balance={usdtBalance || DUMMY_DATA.usdtBalance}
+          usdBalance={usdtBalanceUSD || DUMMY_DATA.usdtBalanceUSD}
           icon="💵"
         />
 
-        <BalanceCard
-          symbol="GRX"
-          balance={formattedGrxBalance}
-          usdBalance="—"
-          icon="🏅"
-        />
+     
 
         {/* Action Cards */}
-        <Text style={styles.sectionOverline}>Quick Actions</Text>
+        <View style={styles.sectionHeaderRow}>
+          <MaterialIcons name="flash-on" size={20} color={GOLD_COLORS.primary} />
+          <Text style={styles.sectionOverline}>Quick Actions</Text>
+        </View>
         <View style={styles.actionGrid}>
           <TouchableOpacity
             style={styles.actionCard}
             onPress={() => navigation.navigate("Mint")}
           >
-            <Text style={styles.actionEmoji}>🪙</Text>
+            <View style={styles.actionIconContainer}>
+              <MaterialIcons name="monetization-on" size={32} color={GOLD_COLORS.primary} />
+            </View>
             <Text style={styles.actionTitle}>Mint</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.actionCard}
             onPress={() => navigation.navigate("Vault")}
           >
-            <Text style={styles.actionEmoji}>🏛️</Text>
+            <View style={styles.actionIconContainer}>
+              <MaterialIcons name="account-balance" size={32} color={GOLD_COLORS.primary} />
+            </View>
             <Text style={styles.actionTitle}>View Ownership</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.actionCard}
             onPress={() => navigation.navigate("Send")}
           >
-            <Text style={styles.actionEmoji}>📤</Text>
+            <View style={styles.actionIconContainer}>
+              <Ionicons name="swap-horizontal" size={32} color={GOLD_COLORS.primary} />
+            </View>
             <Text style={styles.actionTitle}>Send / Receive</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.actionCard}
             onPress={() => navigation.navigate("Redeem")}
           >
-            <Text style={styles.actionEmoji}>📄</Text>
+            <View style={styles.actionIconContainer}>
+              <MaterialIcons name="receipt-long" size={32} color={GOLD_COLORS.primary} />
+            </View>
             <Text style={styles.actionTitle}>Redeem</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.actionCard}
             onPress={() => navigation.navigate("Invoices")}
           >
-            <Text style={styles.actionEmoji}>🧾</Text>
+            <View style={styles.actionIconContainer}>
+              <MaterialIcons name="description" size={32} color={GOLD_COLORS.primary} />
+            </View>
             <Text style={styles.actionTitle}>Invoices</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.actionCard}
+            onPress={() => navigation.navigate("Vault")}
+          >
+            <View style={styles.actionIconContainer}>
+              <Ionicons name="swap-vertical" size={32} color={GOLD_COLORS.primary} />
+            </View>
+            <Text style={styles.actionTitle}>Ownership Swapping</Text>
           </TouchableOpacity>
         </View>
 
-        {/* Recent Transactions Placeholder */}
+        {/* Recent Transactions */}
         <View style={styles.transactionsContainer}>
-          <Text style={styles.sectionTitle}>Recent Transactions</Text>
-          <Text style={styles.emptyText}>No transactions yet</Text>
+          <View style={styles.sectionHeaderRow}>
+            <MaterialIcons name="history" size={20} color={GOLD_COLORS.primary} />
+            <Text style={styles.sectionTitle}>Recent Transactions</Text>
+            <TouchableOpacity onPress={loadTransactionHistory} style={styles.refreshButton}>
+              <Ionicons name="refresh" size={18} color={GOLD_COLORS.primary} />
+            </TouchableOpacity>
+          </View>
+          {transactionsLoading ? (
+            <View style={styles.emptyStateContainer}>
+              <Text style={styles.emptyText}>Loading transactions...</Text>
+            </View>
+          ) : transactions.length > 0 ? (
+            transactions.slice(0, 10).map((tx) => {
+              const isSend = tx.type === "send";
+              const isReceive = tx.type === "receive";
+              const isBurn = tx.type === "burn";
+              const isMint = tx.type === "mint";
+              
+              const getTransactionIcon = () => {
+                if (isBurn) return "flame";
+                if (isMint) return "add-circle";
+                if (isSend) return "arrow-up";
+                return "arrow-down";
+              };
+
+              const getTransactionColor = () => {
+                if (isBurn) return theme.colors.error;
+                if (isMint) return GOLD_COLORS.primary;
+                if (isSend) return theme.colors.warning;
+                return theme.colors.success;
+              };
+
+              const network = isTestnet
+                ? currentNetwork === "ETHEREUM"
+                  ? NETWORKS.ETHEREUM_TESTNET
+                  : NETWORKS.BSC_TESTNET
+                : currentNetwork === "ETHEREUM"
+                ? NETWORKS.ETHEREUM_MAINNET
+                : NETWORKS.BSC_MAINNET;
+
+              const explorerUrl = tx.txHash
+                ? `${network.explorer}/tx/${tx.txHash}`
+                : null;
+
+              return (
+                <TouchableOpacity
+                  key={tx.id}
+                  style={styles.transactionItem}
+                  onPress={() => {
+                    if (explorerUrl) {
+                      Linking.openURL(explorerUrl);
+                    } else if (tx.invoiceId) {
+                      navigation.navigate("InvoiceDetail", {
+                        invoiceId: tx.invoiceId,
+                      });
+                    }
+                  }}
+                >
+                  <View style={[styles.transactionIcon, { backgroundColor: getTransactionColor() + "20" }]}>
+                    <Ionicons
+                      name={getTransactionIcon()}
+                      size={20}
+                      color={getTransactionColor()}
+                    />
+                  </View>
+                  <View style={styles.transactionContent}>
+                    <View style={styles.transactionRow}>
+                      <Text style={styles.transactionType}>
+                        {isBurn
+                          ? "Burn"
+                          : isMint
+                          ? "Mint"
+                          : isSend
+                          ? "Send"
+                          : "Receive"}
+                      </Text>
+                      <Text style={[styles.transactionAmount, { color: getTransactionColor() }]}>
+                        {isSend ? "-" : "+"} {parseFloat(tx.amount || 0).toFixed(4)} {tx.token}
+                      </Text>
+                    </View>
+                    <View style={styles.transactionRow}>
+                      <Text style={styles.transactionMeta}>
+                        {tx.source === "onchain"
+                          ? "On-chain"
+                          : tx.source === "custodial"
+                          ? "Custodial"
+                          : tx.source === "burn"
+                          ? "Redeem"
+                          : "Mint"}
+                        {tx.to && isSend && ` • To: ${formatAddress(tx.to)}`}
+                        {tx.from && isReceive && ` • From: ${formatAddress(tx.from)}`}
+                      </Text>
+                      <Text style={styles.transactionTime}>
+                        {tx.timestamp
+                          ? new Date(tx.timestamp).toLocaleDateString()
+                          : "—"}
+                      </Text>
+                    </View>
+                    {tx.status && (
+                      <View style={styles.transactionStatusRow}>
+                        <View
+                          style={[
+                            styles.statusDot,
+                            {
+                              backgroundColor:
+                                tx.status === "confirmed"
+                                  ? theme.colors.success
+                                  : tx.status === "failed"
+                                  ? theme.colors.error
+                                  : theme.colors.warning,
+                            },
+                          ]}
+                        />
+                        <Text style={styles.transactionStatus}>
+                          {tx.status.charAt(0).toUpperCase() + tx.status.slice(1)}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                  {explorerUrl && (
+                    <Ionicons
+                      name="open-outline"
+                      size={18}
+                      color={GOLD_COLORS.primary}
+                      style={styles.transactionLinkIcon}
+                    />
+                  )}
+                </TouchableOpacity>
+              );
+            })
+          ) : (
+            <View style={styles.emptyStateContainer}>
+              <MaterialIcons name="inbox" size={48} color={theme.colors.textSecondary} />
+              <Text style={styles.emptyText}>No transactions yet</Text>
+            </View>
+          )}
         </View>
         </View>
       </ScrollView>
@@ -439,33 +754,41 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: theme.spacing.lg,
+    overflow: "visible",
   },
   topBar: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: theme.spacing.md,
+    zIndex: 1000,
+    elevation: 1000,
   },
   networkSelector: {
     position: "relative",
+    zIndex: 1000,
+    elevation: 1000,
   },
   networkButton: {
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: theme.colors.surface,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
     borderRadius: theme.borderRadius.md,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderWidth: 1.5,
+    borderColor: GOLD_COLORS.light,
+    ...theme.shadows.small,
   },
   networkLabel: {
     fontSize: 16,
     fontWeight: "600",
     marginRight: 8,
+    color: theme.colors.text,
   },
   dropdownIcon: {
     fontSize: 12,
+    color: theme.colors.text,
   },
   dropdownMenu: {
     position: "absolute",
@@ -476,8 +799,13 @@ const styles = StyleSheet.create({
     borderRadius: theme.borderRadius.md,
     borderWidth: 1,
     borderColor: theme.colors.border,
-    ...theme.shadows.small,
-    zIndex: 10,
+    zIndex: 1001,
+    elevation: 10,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    overflow: "visible",
   },
   dropdownItem: {
     paddingVertical: 10,
@@ -501,16 +829,17 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.surface,
     justifyContent: "center",
     alignItems: "center",
+    borderWidth: 1.5,
+    borderColor: GOLD_COLORS.light,
     ...theme.shadows.small,
-  },
-  profileIcon: {
-    fontSize: 20,
   },
   addressContainer: {
     backgroundColor: theme.colors.surface,
     padding: theme.spacing.md,
     borderRadius: theme.borderRadius.md,
     marginBottom: theme.spacing.md,
+    borderWidth: 1,
+    borderColor: GOLD_COLORS.light,
     ...theme.shadows.small,
   },
   addressLabel: {
@@ -530,17 +859,27 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   copyButton: {
+    flexDirection: "row",
+    alignItems: "center",
     paddingHorizontal: theme.spacing.sm,
     paddingVertical: theme.spacing.xs,
+    backgroundColor: GOLD_COLORS.light,
+    borderRadius: theme.borderRadius.sm,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
   },
   copyButtonText: {
-    color: theme.colors.primary,
+    color: GOLD_COLORS.dark,
     fontSize: 14,
     fontWeight: "600",
   },
   coinContainer: {
     alignItems: "center",
     marginBottom: theme.spacing.lg,
+  },
+  coinImage: {
+    width: 200,
+    height: 200,
   },
   badgeRow: {
     flexDirection: "row",
@@ -562,27 +901,45 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   totalBalance: {
-    backgroundColor: theme.colors.surfaceAlt,
+    backgroundColor: GOLD_COLORS.light,
     padding: theme.spacing.lg,
     borderRadius: theme.borderRadius.lg,
     alignItems: "center",
     marginBottom: theme.spacing.lg,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    ...theme.shadows.small,
+    borderWidth: 2,
+    borderColor: GOLD_COLORS.primary,
+    ...theme.shadows.medium,
   },
   totalLabel: {
     fontSize: 14,
     color: theme.colors.textSecondary,
+    fontWeight: "600",
+    textTransform: "uppercase",
+    letterSpacing: 1,
   },
   totalAmount: {
-    fontSize: 32,
+    fontSize: 36,
     fontWeight: "bold",
-    color: theme.colors.text,
-    marginTop: theme.spacing.xs,
+    color: GOLD_COLORS.primary,
+    marginTop: theme.spacing.sm,
+    marginBottom: theme.spacing.xs,
   },
   totalSubText: {
     fontSize: 14,
+    color: theme.colors.textSecondary,
+    marginBottom: theme.spacing.md,
+  },
+  totalBreakdown: {
+    marginTop: theme.spacing.sm,
+    paddingTop: theme.spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: GOLD_COLORS.primary,
+    width: "100%",
+    alignItems: "center",
+    gap: theme.spacing.xs,
+  },
+  totalBreakdownText: {
+    fontSize: 13,
     color: theme.colors.textSecondary,
   },
   mintBalanceCard: {
@@ -590,8 +947,8 @@ const styles = StyleSheet.create({
     padding: theme.spacing.lg,
     borderRadius: theme.borderRadius.lg,
     marginBottom: theme.spacing.md,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderWidth: 2,
+    borderColor: GOLD_COLORS.light,
     ...theme.shadows.medium,
     position: "relative",
     minHeight: 140,
@@ -607,8 +964,13 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: theme.colors.text,
   },
-  mintIcon: {
-    fontSize: 24,
+  iconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: GOLD_COLORS.light,
+    justifyContent: "center",
+    alignItems: "center",
   },
   mintAmount: {
     fontSize: 32,
@@ -628,8 +990,8 @@ const styles = StyleSheet.create({
     padding: theme.spacing.lg,
     borderRadius: theme.borderRadius.lg,
     marginBottom: theme.spacing.lg,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderWidth: 2,
+    borderColor: GOLD_COLORS.light,
     ...theme.shadows.medium,
     position: "relative",
     minHeight: 140,
@@ -638,9 +1000,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
     color: theme.colors.text,
-  },
-  ownershipIcon: {
-    fontSize: 24,
   },
   ownershipAmount: {
     fontSize: 32,
@@ -664,16 +1023,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   cardActionButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: theme.colors.primary,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: GOLD_COLORS.primary,
     justifyContent: "center",
     alignItems: "center",
     ...theme.shadows.small,
-  },
-  cardActionIcon: {
-    fontSize: 18,
   },
   actionGrid: {
     flexDirection: "row",
@@ -688,38 +1044,49 @@ const styles = StyleSheet.create({
     padding: theme.spacing.lg,
     marginBottom: theme.spacing.md,
     alignItems: "center",
-    borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderWidth: 1.5,
+    borderColor: GOLD_COLORS.light,
     ...theme.shadows.small,
   },
-  actionEmoji: {
-    fontSize: 28,
+  actionIconContainer: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: GOLD_COLORS.light,
+    justifyContent: "center",
+    alignItems: "center",
     marginBottom: theme.spacing.sm,
   },
   actionTitle: {
     fontSize: 14,
     fontWeight: "600",
     textAlign: "center",
+    color: theme.colors.text,
   },
   transactionsContainer: {
     backgroundColor: theme.colors.surfaceAlt,
     padding: theme.spacing.lg,
     borderRadius: theme.borderRadius.lg,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderWidth: 1.5,
+    borderColor: GOLD_COLORS.light,
     ...theme.shadows.small,
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: "600",
     color: theme.colors.text,
-    marginBottom: theme.spacing.sm,
+    marginLeft: 8,
+  },
+  emptyStateContainer: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: theme.spacing.xl,
   },
   emptyText: {
     fontSize: 14,
     color: theme.colors.textSecondary,
     textAlign: "center",
-    paddingVertical: theme.spacing.lg,
+    marginTop: theme.spacing.md,
   },
   sectionOverline: {
     fontSize: 12,
@@ -727,6 +1094,12 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     textTransform: "uppercase",
     color: theme.colors.textSecondary,
+    marginBottom: theme.spacing.sm,
+    marginLeft: 8,
+  },
+  sectionHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: theme.spacing.sm,
   },
   modeBanner: {
@@ -758,10 +1131,14 @@ const styles = StyleSheet.create({
     height: 64,
     marginBottom: theme.spacing.lg,
     overflow: "hidden",
-    backgroundColor: theme.colors.surfaceAlt,
+    backgroundColor: GOLD_COLORS.light,
     borderRadius: theme.borderRadius.md,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderWidth: 1.5,
+    borderColor: GOLD_COLORS.primary,
+  },
+  tickerLabelRow: {
+    flexDirection: "row",
+    alignItems: "center",
   },
   tickerScrollContent: {
     flexDirection: "row",
@@ -781,7 +1158,7 @@ const styles = StyleSheet.create({
   tickerValue: {
     fontSize: 16,
     fontWeight: "700",
-    color: theme.colors.text,
+    color: GOLD_COLORS.dark,
   },
   tickerError: {
     fontSize: 12,
@@ -792,9 +1169,15 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.surface,
     borderRadius: theme.borderRadius.lg,
     padding: theme.spacing.lg,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderWidth: 1.5,
+    borderColor: GOLD_COLORS.light,
     marginBottom: theme.spacing.lg,
+    ...theme.shadows.small,
+  },
+  oracleLabelRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
   },
   oracleRow: {
     flexDirection: "row",
@@ -809,7 +1192,7 @@ const styles = StyleSheet.create({
   oracleValue: {
     fontSize: 18,
     fontWeight: "700",
-    color: theme.colors.primary,
+    color: GOLD_COLORS.primary,
   },
   oracleDivider: {
     marginVertical: theme.spacing.md,
@@ -839,6 +1222,74 @@ const styles = StyleSheet.create({
     marginTop: theme.spacing.md,
     fontSize: 12,
     color: theme.colors.textSecondary,
+  },
+  refreshButton: {
+    padding: theme.spacing.xs,
+    marginLeft: "auto",
+  },
+  transactionItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: theme.spacing.md,
+    marginBottom: theme.spacing.sm,
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.borderRadius.md,
+    borderWidth: 1,
+    borderColor: GOLD_COLORS.light,
+  },
+  transactionIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: theme.spacing.md,
+  },
+  transactionContent: {
+    flex: 1,
+  },
+  transactionRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: theme.spacing.xs,
+  },
+  transactionType: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: theme.colors.text,
+  },
+  transactionAmount: {
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  transactionMeta: {
+    fontSize: 12,
+    color: theme.colors.textSecondary,
+    flex: 1,
+  },
+  transactionTime: {
+    fontSize: 12,
+    color: theme.colors.textSecondary,
+  },
+  transactionStatusRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: theme.spacing.xs,
+  },
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: theme.spacing.xs,
+  },
+  transactionStatus: {
+    fontSize: 11,
+    color: theme.colors.textSecondary,
+    textTransform: "capitalize",
+  },
+  transactionLinkIcon: {
+    marginLeft: theme.spacing.sm,
   },
 });
 

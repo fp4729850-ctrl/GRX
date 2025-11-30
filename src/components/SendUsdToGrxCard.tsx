@@ -5,20 +5,6 @@ import { ORACLE_SNAPSHOT_CONFIG } from '../utils/constants';
 import { computeGrxFromUsd, ComputeGrxFromUsdResult } from '../pricing/computeGrxFromUsd';
 import { GrxPricingSnapshot } from '../hooks/useGrxPricing';
 
-const COUNTRIES_TO_FX = ['INR', 'AED', 'RUB', 'CNY'] as const;
-
-const resolveFxKey = (country?: string | null) => {
-  if (!country) {
-    return null;
-  }
-  const upper = country.toUpperCase();
-  if (upper === 'AE') return 'USD_AED';
-  if (upper === 'IN') return 'USD_INR';
-  if (upper === 'RU') return 'USD_RUB';
-  if (upper === 'CN') return 'USD_CNY';
-  return null;
-};
-
 const formatNumber = (value: number, fractionDigits = 2) =>
   new Intl.NumberFormat('en-US', {
     minimumFractionDigits: fractionDigits,
@@ -26,6 +12,16 @@ const formatNumber = (value: number, fractionDigits = 2) =>
   }).format(value);
 
 const allowedWindowMinutes = ORACLE_SNAPSHOT_CONFIG.allowedWindowMinutes || 10;
+
+const getFxRate = (pricing: GrxPricingSnapshot | null, key: string): number | null => {
+  if (!pricing?.fx) return null;
+  const value = pricing.fx[key] ?? pricing.fx[key.toLowerCase()] ?? null;
+  if (typeof value === 'string') {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+  }
+  return Number.isFinite(value) && value > 0 ? Number(value) : null;
+};
 
 export interface SendUsdToGrxCardProps {
   pricing: GrxPricingSnapshot | null;
@@ -40,7 +36,6 @@ export interface SendUsdToGrxCardProps {
 
 const SendUsdToGrxCard: React.FC<SendUsdToGrxCardProps> = ({
   pricing,
-  userCountry,
   feePct = 0.01,
   precision = 6,
   value,
@@ -48,8 +43,6 @@ const SendUsdToGrxCard: React.FC<SendUsdToGrxCardProps> = ({
   onQuoteChange,
   snapshotValid,
 }) => {
-  const fxKey = resolveFxKey(userCountry);
-
   const quote = useMemo(() => {
     if (!pricing || !value?.length) {
       return null;
@@ -60,18 +53,25 @@ const SendUsdToGrxCard: React.FC<SendUsdToGrxCardProps> = ({
       return null;
     }
 
+    if (!Number.isFinite(pricing.goldPerGramUSD) || pricing.goldPerGramUSD <= 0) {
+      return null;
+    }
+
     try {
       return computeGrxFromUsd({
         desiredUsd,
         goldPerGramUSD: pricing.goldPerGramUSD,
         feePct,
         precision,
-        fxRate: fxKey ? Number(pricing.fx?.[fxKey] ?? null) : null,
+        fxRates: {
+          USD_INR: getFxRate(pricing, 'USD_INR'),
+          USD_AED: getFxRate(pricing, 'USD_AED'),
+        },
       });
     } catch {
       return null;
     }
-  }, [pricing, value, feePct, precision, fxKey]);
+  }, [pricing, value, feePct, precision]);
 
   useEffect(() => {
     onQuoteChange(quote);
@@ -93,12 +93,15 @@ const SendUsdToGrxCard: React.FC<SendUsdToGrxCardProps> = ({
       ? `Snapshot older than ${allowedWindowMinutes} minutes.`
       : null;
 
+  const hasGoldPriceError = pricing && (!pricing.goldPerGramUSD || pricing.goldPerGramUSD <= 0);
+  const hasFxError = pricing && (!getFxRate(pricing, 'USD_INR') || !getFxRate(pricing, 'USD_AED'));
+
   return (
     <View style={styles.card}>
       <View style={styles.headerRow}>
         <Text style={styles.cardTitle}>Send by USD amount</Text>
         <View style={styles.snapshotBadge}>
-          <Text style={styles.snapshotBadgeText}>Using signed snapshot</Text>
+          <Text style={styles.snapshotBadgeText}>Using signed Oracle snapshot</Text>
         </View>
       </View>
 
@@ -111,36 +114,58 @@ const SendUsdToGrxCard: React.FC<SendUsdToGrxCardProps> = ({
         onChangeText={onChangeValue}
       />
 
-      {snapshotWarning ? (
+      {hasGoldPriceError && (
+        <Text style={styles.warningText}>
+          ⚠️ Gold price unavailable or invalid
+        </Text>
+      )}
+
+      {hasFxError && (
+        <Text style={styles.warningText}>
+          ⚠️ FX rates (INR/AED) missing or invalid
+        </Text>
+      )}
+
+      {snapshotWarning && (
         <Text style={styles.warningText}>{snapshotWarning}</Text>
-      ) : null}
+      )}
 
       {quote ? (
         <View style={styles.metrics}>
           <View style={styles.metricRow}>
             <Text style={styles.metricLabel}>GRX required</Text>
             <Text style={styles.metricValue}>
-              {formatNumber(quote.finalGrams, precision)}
+              {formatNumber(quote.finalGrams, precision)} GRX
             </Text>
           </View>
           <View style={styles.metricRow}>
-            <Text style={styles.metricLabel}>Amount (wei)</Text>
-            <Text style={styles.metricValueMono}>{quote.amountWei}</Text>
-          </View>
-          <View style={styles.metricRow}>
             <Text style={styles.metricLabel}>USD value</Text>
-            <Text style={styles.metricValue}>${formatNumber(quote.usdValue)}</Text>
+            <Text style={styles.metricValue}>${formatNumber(quote.usdCovered, 2)}</Text>
           </View>
-          {quote.localFiatValue !== null && (
-            <View style={styles.metricRow}>
-              <Text style={styles.metricLabel}>
-                Local ({fxKey?.replace('USD_', '')})
-              </Text>
-              <Text style={styles.metricValue}>
-                {formatNumber(quote.localFiatValue)}
+          <View style={styles.localCurrencyRow}>
+            <View style={styles.localCurrencyItem}>
+              <Text style={styles.localCurrencyLabel}>INR</Text>
+              <Text style={styles.localCurrencyValue}>
+                {quote.inrValue !== null
+                  ? `₹${formatNumber(quote.inrValue, 2)}`
+                  : '—'}
               </Text>
             </View>
-          )}
+            <View style={styles.localCurrencyItem}>
+              <Text style={styles.localCurrencyLabel}>AED</Text>
+              <Text style={styles.localCurrencyValue}>
+                {quote.aedValue !== null
+                  ? `${formatNumber(quote.aedValue, 2)} AED`
+                  : '—'}
+              </Text>
+            </View>
+          </View>
+          <View style={styles.metricRow}>
+            <Text style={styles.metricLabel}>Amount (wei)</Text>
+            <Text style={styles.metricValueMono} numberOfLines={1}>
+              {quote.amountWei}
+            </Text>
+          </View>
         </View>
       ) : (
         <Text style={styles.helperText}>
@@ -237,6 +262,29 @@ const styles = StyleSheet.create({
     color: theme.colors.textSecondary,
     fontFamily: Platform.OS === 'web' ? 'monospace' : undefined,
     maxWidth: 220,
+  },
+  localCurrencyRow: {
+    flexDirection: 'row',
+    gap: theme.spacing.md,
+    marginTop: theme.spacing.sm,
+    marginBottom: theme.spacing.xs,
+  },
+  localCurrencyItem: {
+    flex: 1,
+    backgroundColor: theme.colors.surfaceAlt,
+    borderRadius: theme.borderRadius.md,
+    padding: theme.spacing.sm,
+    alignItems: 'center',
+  },
+  localCurrencyLabel: {
+    fontSize: 12,
+    color: theme.colors.textSecondary,
+    marginBottom: theme.spacing.xs / 2,
+  },
+  localCurrencyValue: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: theme.colors.text,
   },
   snapshotMeta: {
     flexDirection: 'row',

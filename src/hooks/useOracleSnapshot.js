@@ -39,14 +39,20 @@ export const useOracleSnapshot = (pollInterval = DEFAULT_POLL_INTERVAL, forceRef
     setError(null);
     try {
       const data = await fetchOracleSnapshot();
-      setSnapshot({
-        id: data?.id || data?.snapshotId,
-        timestamp: data?.timestamp || data?.updatedAt,
-        goldPerGramUSD: data?.goldPerGramUSD || data?.goldPriceUSD,
-        fx: typeof data?.fx === 'string' ? JSON.parse(data.fx) : data?.fx || {},
-        signature: data?.signature,
-        sources: data?.sources || data?.source ? [data.source] : [],
-      });
+      if (data) {
+        setSnapshot({
+          id: data?.id || data?.snapshotId,
+          timestamp: data?.timestamp || data?.updatedAt,
+          goldPerGramUSD: data?.goldPerGramUSD || data?.goldPriceUSD,
+          fx: typeof data?.fx === 'string' ? JSON.parse(data.fx) : data?.fx || {},
+          signature: data?.signature,
+          sources: data?.sources || data?.source ? [data.source] : [],
+        });
+      } else {
+        // API base URL not configured or no data available
+        setSnapshot(null);
+        setError(null); // Don't show error if API is not configured
+      }
     } catch (err) {
       console.error('Oracle snapshot fetch failed:', err);
       setError(err.message || 'Failed to fetch oracle snapshot');

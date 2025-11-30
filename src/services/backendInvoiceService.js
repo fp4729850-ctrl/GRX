@@ -11,17 +11,57 @@ const requireApiBase = () => {
 };
 
 export const fetchBackendInvoices = async ({ address }) => {
-  const base = requireApiBase();
-  const { data } = await axios.get(`${base}/api/invoice`, {
-    params: { address },
-  });
-  return data?.invoices || data || [];
+  // Return empty array gracefully if API base URL is not configured
+  if (!API_BASE_URL) {
+    return [];
+  }
+  
+  try {
+    const { data } = await axios.get(`${API_BASE_URL}/api/invoice`, {
+      params: { address },
+    });
+    return data?.invoices || data || [];
+  } catch (error) {
+    // Re-throw to let caller handle it
+    throw error;
+  }
 };
 
 export const fetchBackendInvoiceDetail = async (invoiceId) => {
-  const base = requireApiBase();
-  const { data } = await axios.get(`${base}/api/invoice/${invoiceId}`);
-  return data;
+  // Return null gracefully if API base URL is not configured
+  if (!API_BASE_URL) {
+    return null;
+  }
+  
+  try {
+    const { data } = await axios.get(`${API_BASE_URL}/api/invoice/${invoiceId}`);
+    return data;
+  } catch (error) {
+    // Re-throw to let caller handle it
+    throw error;
+  }
+};
+
+export const fetchPayoutStatus = async (invoiceId) => {
+  // Return null gracefully if API base URL is not configured
+  if (!API_BASE_URL) {
+    return null;
+  }
+  
+  try {
+    const { data } = await axios.get(`${API_BASE_URL}/api/partner/payout-status`, {
+      params: { invoiceId },
+    });
+    return data;
+  } catch (error) {
+    // Return null if payout status not available (invoice might not have payout yet)
+    if (error.response?.status === 404) {
+      return null;
+    }
+    // Silently return null for other errors (network issues, etc.)
+    console.warn(`Failed to fetch payout status for invoice ${invoiceId}:`, error.message);
+    return null;
+  }
 };
 
 
