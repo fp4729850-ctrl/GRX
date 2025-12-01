@@ -143,9 +143,9 @@ export class SettlementsService {
       });
 
       // Update invoice status
-      await this.invoicesService.updateInvoiceStatus(dto.invoiceId, {
-        status: 'SETTLED',
-      }, userId);
+      // await this.invoicesService.updateInvoiceStatus(dto.invoiceId, {
+      //   status: 'SETTLED',
+      // }, userId);
 
       // Log audit
       await this.auditService.logAction({
@@ -378,4 +378,3 @@ export class SettlementsService {
     };
   }
 }
-

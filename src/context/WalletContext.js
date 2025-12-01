@@ -8,7 +8,9 @@ import {
   setIsTestnet as storeIsTestnet,
   getCustodialMode,
   setCustodialMode as storeCustodialMode,
+  storeWalletAddress,
 } from '../services/storageService';
+import { fetchUserWallets } from '../services/backendWalletService';
 import { getBalance, getTokenBalance } from '../services/networkService';
 import { fetchTokenPrices } from '../services/priceService';
 import { formatBalance } from '../utils/validation';
@@ -66,11 +68,30 @@ export const WalletProvider = ({ children }) => {
 
   const loadWalletData = async () => {
     try {
-      const address = await getWalletAddress();
+      let address = await getWalletAddress();
       const network = await getCurrentNetwork();
       const testnet = await getIsTestnet();
       const custodial = await getCustodialMode();
       const pk = await getPrivateKey();
+
+      // If no local address but backend is available and user is authenticated,
+      // try to pull the primary wallet from the backend.
+      if (!address) {
+        try {
+          const wallets = await fetchUserWallets();
+          if (wallets && wallets.length > 0) {
+            const primary = wallets[0];
+            if (primary?.address) {
+              address = primary.address;
+              // Persist so subsequent app launches have fast local access
+              await storeWalletAddress(primary.address);
+            }
+          }
+        } catch (backendError) {
+          // Silent failure – backend might not be configured or user not logged in yet
+          console.warn('Backend wallet sync skipped:', backendError?.message);
+        }
+      }
 
       if (address) {
         setWalletAddress(address);

@@ -12,6 +12,7 @@ import { VerifyCertificateDto } from './dto/verify-certificate.dto';
 import { UpdateCertificateStatusDto } from './dto/update-certificate-status.dto';
 import { ethers } from 'ethers';
 import { Decimal } from '@prisma/client/runtime/library';
+import { v4 as uuidv4 } from 'uuid';
 
 @Injectable()
 export class CertificatesService {
@@ -134,6 +135,7 @@ export class CertificatesService {
       // Create certificate
       const certificate = await this.prisma.certificates.create({
         data: {
+          id: uuidv4(),
           certId,
           vaultPartner: dto.vaultPartner,
           vaultCertId: dto.vaultCertId,
@@ -142,7 +144,8 @@ export class CertificatesService {
           signature: dto.signature,
           grams: new Decimal(dto.grams),
           status: isValidSignature ? 'VERIFIED' : 'PENDING',
-        },
+          updatedAt: new Date(),
+        } as any,
       });
 
       // Log audit

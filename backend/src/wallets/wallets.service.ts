@@ -73,7 +73,7 @@ export class WalletsService {
           privateKeyEncrypted,
           network: dto.network,
           isTestnet: dto.isTestnet,
-        },
+        } as any,
       });
 
       this.logger.log(`Wallet created: ${address} for user ${userId}`);
@@ -177,7 +177,7 @@ export class WalletsService {
           privateKeyEncrypted,
           network: dto.network,
           isTestnet: dto.isTestnet,
-        },
+        } as any,
       });
 
       this.logger.log(`Wallet imported: ${address} for user ${userId}`);

@@ -117,14 +117,14 @@ export class UsersService {
     return kycDocument;
   }
 
-  async updateusers_kycStatus(userId: string, updateusers_kycStatusDto: Updateusers_kycStatusDto) {
+  async updateKycStatus(userId: string, updateKycStatusDto: UpdateKycStatusDto) {
     const user = await this.findById(userId);
 
     const updateData: any = {
-      kycStatus: updateusers_kycStatusDto.status,
+      kycStatus: updateKycStatusDto.status,
     };
 
-    if (updateusers_kycStatusDto.status === users_kycStatus.VERIFIED) {
+    if (updateKycStatusDto.status === users_kycStatus.VERIFIED) {
       updateData.kycVerifiedAt = new Date();
     }
 

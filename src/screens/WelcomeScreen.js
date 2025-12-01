@@ -5,6 +5,8 @@ import {
   StyleSheet,
   TouchableOpacity,
   Animated,
+  Image,
+  Dimensions,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { theme } from '../styles/theme';
@@ -19,6 +21,10 @@ const GOLD_COLORS = {
 
 const WelcomeScreen = ({ navigation }) => {
   const fadeAnim = React.useRef(new Animated.Value(0)).current;
+  
+  // Get screen width for responsive design
+  const screenWidth = Dimensions.get('window').width;
+  const isLargeScreen = screenWidth >= 768; // Tablet/Desktop breakpoint
 
   React.useEffect(() => {
     Animated.timing(fadeAnim, {
@@ -31,11 +37,17 @@ const WelcomeScreen = ({ navigation }) => {
   return (
     <View style={styles.container}>
       <Animated.View style={[styles.content, { opacity: fadeAnim }]}>
-        <View style={styles.iconContainer}>
-          <MaterialIcons name="account-balance-wallet" size={80} color={GOLD_COLORS.primary} />
+        <View style={styles.logoContainer}>
+         
+         
+            <Image
+              source={require('./assets/mobile_logo.png')}
+              style={styles.mobileLogo}
+              resizeMode="cover"
+            />
         </View>
         <Text style={styles.title}>GRX</Text>
-        <Text style={styles.subtitle}>Your Secure Crypto Wallet</Text>
+        <Text style={styles.subtitle}>Permissioned sovereign wallet</Text>
         <Text style={styles.description}>
           Create a new wallet or import an existing one to get started
         </Text>
@@ -73,14 +85,21 @@ const styles = StyleSheet.create({
     maxWidth: 400,
     alignItems: 'center',
   },
-  iconContainer: {
-    width: 140,
-    height: 140,
-    borderRadius: 70,
-    backgroundColor: GOLD_COLORS.light,
-    justifyContent: 'center',
+  logoContainer: {
     alignItems: 'center',
-    marginBottom: theme.spacing.lg,
+    justifyContent: 'center',
+    marginBottom: theme.spacing.xl,
+    width: '100%',
+  },
+  mobileLogo: {
+    width: 250,
+    height: 150,
+    maxWidth: '90%',
+  },
+  desktopLogo: {
+    width: 400,
+    height: 150,
+    maxWidth: '100%',
   },
   title: {
     fontSize: 48,

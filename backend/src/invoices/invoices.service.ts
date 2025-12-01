@@ -89,7 +89,7 @@ export class InvoicesService {
           burnTimestamp: new Date(dto.timestamp),
           oracleSnapshotId: dto.snapshotId,
           expiresAt,
-        },
+        } as any,
       });
 
       // Log audit

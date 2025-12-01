@@ -11,6 +11,7 @@ import {
   Animated,
   Image,
   Linking,
+  Dimensions,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons, MaterialIcons } from "@expo/vector-icons";
@@ -93,6 +94,10 @@ const DashboardScreen = ({ navigation }) => {
     { key: "ETHEREUM", label: "Ethereum" },
     { key: "BSC", label: "BNB Chain" },
   ];
+  
+  // Get screen width for responsive design
+  const screenWidth = Dimensions.get("window").width;
+  const isLargeScreen = screenWidth >= 768; // Tablet/Desktop breakpoint
 
   useEffect(() => {
     // Initial load with delay to avoid rate limiting
@@ -259,6 +264,15 @@ const DashboardScreen = ({ navigation }) => {
         scrollEventThrottle={16}
       >
         <View style={styles.content}>
+        {/* Mobile Logo - Above Top Bar */}
+        <View style={styles.mobileLogoContainer}>
+          <Image
+            source={require("./assets/mobile_logo.png")}
+            style={styles.mobileLogo}
+            resizeMode="cover"
+          />
+        </View>
+
         {/* Top Bar */}
         <View style={styles.topBar}>
           <View style={styles.networkSelector}>
@@ -310,6 +324,15 @@ const DashboardScreen = ({ navigation }) => {
               </View>
             )}
           </View>
+          {isLargeScreen && (
+            <View style={styles.logoContainer}>
+              <Image
+                source={require("./assets/logo.png")}
+                style={styles.topBarLogo}
+                resizeMode="cover"
+              />
+            </View>
+          )}
           <TouchableOpacity
             style={styles.profileButton}
             onPress={() => navigation.navigate("Settings")}
@@ -762,7 +785,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: theme.spacing.md,
     zIndex: 1000,
+    height: 80,
     elevation: 1000,
+    position: "relative",
   },
   networkSelector: {
     position: "relative",
@@ -832,6 +857,32 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: GOLD_COLORS.light,
     ...theme.shadows.small,
+  },
+  mobileLogoContainer: {
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+  },
+  mobileLogo: {
+    width: 200,
+    height: 120,
+    maxWidth: "80%",
+  },
+  logoContainer: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 999,
+    pointerEvents: "none",
+  },
+  topBarLogo: {
+    width: "30%",
+    height: 100,
   },
   addressContainer: {
     backgroundColor: theme.colors.surface,

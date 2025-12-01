@@ -1,4 +1,4 @@
-import axios from 'axios';
+import { apiClient } from './apiClient';
 import { API_BASE_URL } from '../utils/constants';
 
 export const fetchUserProfile = async () => {
@@ -7,9 +7,8 @@ export const fetchUserProfile = async () => {
   }
 
   try {
-    const { data } = await axios.get(`${API_BASE_URL}/api/users/me`, {
+    const data = await apiClient.get('/api/users/me', {
       timeout: 5000,
-      withCredentials: true,
     });
     return data;
   } catch (error) {

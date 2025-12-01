@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ThrottlerModule } from '@nestjs/throttler';
+import { ScheduleModule } from '@nestjs/schedule';
 import { PrismaModule } from './common/prisma/prisma.module';
 import { CommonModule } from './common/common.module';
 import { AuthModule } from './auth/auth.module';
@@ -26,6 +27,7 @@ import { AdminModule } from './admin/admin.module';
         limit: 100, // 100 requests per minute
       },
     ]),
+    ScheduleModule.forRoot(),
     PrismaModule,
     CommonModule,
     AuthModule,

@@ -337,6 +337,7 @@ export class TokensService {
       // Create proposal in database
       const proposal = await this.prisma.mint_proposals.create({
         data: {
+          id: undefined, // Will be auto-generated
           proposalId,
           userId,
           certId: dto.certId,
@@ -345,7 +346,7 @@ export class TokensService {
           metadata: dto.metadata || null,
           status: 'PENDING',
           signatures: JSON.stringify([]),
-        },
+        } as any,
       });
 
       this.logger.log(`Mint proposal created: ${proposalId} by user ${userId}`);

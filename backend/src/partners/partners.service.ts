@@ -10,6 +10,7 @@ import { EncryptionService } from '../common/services/encryption.service';
 import { AuditService } from '../common/services/audit.service';
 import { CreatePartnerDto } from './dto/create-partner.dto';
 import axios from 'axios';
+import { v4 as uuidv4 } from 'uuid';
 
 @Injectable()
 export class PartnersService {
@@ -59,6 +60,7 @@ export class PartnersService {
       // Create partner
       const partner = await this.prisma.partners.create({
         data: {
+          id: uuidv4(),
           name: dto.name,
           apiKey: dto.apiKey,
           apiKeyHash,
@@ -66,7 +68,8 @@ export class PartnersService {
           ipAllowlist: dto.ipAllowlist || null,
           supportedCurrencies: dto.supportedCurrencies,
           status: 'ACTIVE',
-        },
+          updatedAt: new Date(),
+        } as any,
       });
 
       this.logger.log(`Partner created: ${partner.name} (${partner.id})`);

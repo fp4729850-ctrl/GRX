@@ -347,3 +347,53 @@ export const clearAllData = async () => {
   }
 };
 
+/**
+ * Store auth JWT token
+ */
+export const storeAuthToken = async (token) => {
+  try {
+    if (isWeb) {
+      await AsyncStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, token);
+    } else {
+      await SecureStore.setItemAsync(STORAGE_KEYS.AUTH_TOKEN, token);
+    }
+    return true;
+  } catch (error) {
+    console.error('Error storing auth token:', error);
+    return false;
+  }
+};
+
+/**
+ * Get auth JWT token
+ */
+export const getAuthToken = async () => {
+  try {
+    if (isWeb) {
+      return await AsyncStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
+    } else {
+      return await SecureStore.getItemAsync(STORAGE_KEYS.AUTH_TOKEN);
+    }
+  } catch (error) {
+    console.error('Error retrieving auth token:', error);
+    return null;
+  }
+};
+
+/**
+ * Clear auth JWT token
+ */
+export const clearAuthToken = async () => {
+  try {
+    if (isWeb) {
+      await AsyncStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
+    } else {
+      await SecureStore.deleteItemAsync(STORAGE_KEYS.AUTH_TOKEN);
+    }
+    return true;
+  } catch (error) {
+    console.error('Error clearing auth token:', error);
+    return false;
+  }
+};
+

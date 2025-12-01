@@ -37,13 +37,15 @@ export class AuthService {
     // Create user
     const user = await this.prisma.users.create({
       data: {
+        id: undefined, // Will be auto-generated
         email,
         phone,
         passwordHash,
         firstName,
         lastName,
         role: 'INDIVIDUAL',
-      },
+        updatedAt: new Date(),
+      } as any,
       select: {
         id: true,
         email: true,

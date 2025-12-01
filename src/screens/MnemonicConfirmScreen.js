@@ -14,7 +14,10 @@ import {
   storeMnemonic,
   storePrivateKey,
   storeWalletAddress,
+  getCurrentNetwork,
+  getIsTestnet,
 } from '../services/storageService';
+import { createBackendWallet } from '../services/backendWalletService';
 import { useWallet } from '../context/WalletContext';
 import { theme } from '../styles/theme';
 
@@ -105,6 +108,19 @@ const MnemonicConfirmScreen = ({ route, navigation }) => {
       await storeMnemonic(mnemonic);
       await storePrivateKey(wallet.privateKey);
       await storeWalletAddress(wallet.address);
+
+      // Best-effort: register wallet with backend if available
+      try {
+        const network = (await getCurrentNetwork()) || 'ETHEREUM';
+        const isTestnet = await getIsTestnet();
+        await createBackendWallet({
+          address: wallet.address,
+          network,
+          isTestnet: !!isTestnet,
+        });
+      } catch (backendError) {
+        console.warn('Backend wallet registration failed (create):', backendError?.message);
+      }
 
       // Initialize wallet context
       initializeWallet(wallet.address, wallet.privateKey);

@@ -44,6 +44,7 @@ export const STORAGE_KEYS = {
   CURRENT_NETWORK: 'currentNetwork',
   IS_TESTNET: 'isTestnet',
   CUSTODIAL_MODE: 'custodialMode',
+  AUTH_TOKEN: 'authToken',
   INVOICES: 'grxInvoices',
 };
 

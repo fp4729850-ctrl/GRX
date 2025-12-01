@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
+import { v4 as uuidv4 } from 'uuid';
 
 const prisma = new PrismaClient();
 
@@ -12,6 +13,7 @@ async function main() {
     where: { email: 'admin@bricspay.com' },
     update: {},
     create: {
+      id: uuidv4(),
       email: 'admin@bricspay.com',
       passwordHash: adminPassword,
       firstName: 'Admin',
@@ -19,7 +21,8 @@ async function main() {
       role: 'ADMIN',
       kycStatus: 'VERIFIED',
       kycVerifiedAt: new Date(),
-    },
+      updatedAt: new Date(),
+    } as any,
   });
   console.log('✅ Admin user created:', admin.email);
 
@@ -32,6 +35,7 @@ async function main() {
     where: { apiKey: partnerApiKey },
     update: {},
     create: {
+      id: uuidv4(),
       name: 'Default Settlement Partner',
       apiKey: partnerApiKey,
       apiKeyHash,
@@ -39,7 +43,8 @@ async function main() {
       ipAllowlist: JSON.stringify(['127.0.0.1', '::1']),
       supportedCurrencies: JSON.stringify(['INR', 'AED', 'RUB', 'CNY', 'USD']),
       status: 'ACTIVE',
-    },
+      updatedAt: new Date(),
+    } as any,
   });
   console.log('✅ Default partner created:', partner.name);
   console.log('   API Key:', partnerApiKey);
@@ -66,10 +71,12 @@ async function main() {
       where: { email: userData.email },
       update: {},
       create: {
+        id: uuidv4(),
         ...userData,
         passwordHash: password,
         kycStatus: 'PENDING',
-      },
+        updatedAt: new Date(),
+      } as any,
     });
     console.log('✅ Test user created:', user.email);
   }

@@ -1,14 +1,5 @@
-import axios from "axios";
+import { apiClient } from "./apiClient";
 import { API_BASE_URL } from "../utils/constants";
-
-const requireApiBase = () => {
-  if (!API_BASE_URL) {
-    throw new Error(
-      "API base URL missing. Set EXPO_PUBLIC_API_BASE_URL to enable custodial invoice flows."
-    );
-  }
-  return API_BASE_URL;
-};
 
 export const fetchBackendInvoices = async ({ address }) => {
   // Return empty array gracefully if API base URL is not configured
@@ -17,7 +8,7 @@ export const fetchBackendInvoices = async ({ address }) => {
   }
   
   try {
-    const { data } = await axios.get(`${API_BASE_URL}/api/invoice`, {
+    const data = await apiClient.get("/api/invoice", {
       params: { address },
     });
     return data?.invoices || data || [];
@@ -34,7 +25,7 @@ export const fetchBackendInvoiceDetail = async (invoiceId) => {
   }
   
   try {
-    const { data } = await axios.get(`${API_BASE_URL}/api/invoice/${invoiceId}`);
+    const data = await apiClient.get(`/api/invoice/${invoiceId}`);
     return data;
   } catch (error) {
     // Re-throw to let caller handle it
@@ -49,7 +40,7 @@ export const fetchPayoutStatus = async (invoiceId) => {
   }
   
   try {
-    const { data } = await axios.get(`${API_BASE_URL}/api/partner/payout-status`, {
+    const data = await apiClient.get("/api/partner/payout-status", {
       params: { invoiceId },
     });
     return data;

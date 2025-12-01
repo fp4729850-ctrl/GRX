@@ -16,7 +16,10 @@ import {
   storePrivateKey,
   storeWalletAddress,
   getPINHash,
+  getCurrentNetwork,
+  getIsTestnet,
 } from '../services/storageService';
+import { importBackendWallet } from '../services/backendWalletService';
 import { useWallet } from '../context/WalletContext';
 import { theme } from '../styles/theme';
 
@@ -58,6 +61,19 @@ const ImportWalletScreen = ({ navigation }) => {
       await storeMnemonic(trimmedMnemonic);
       await storePrivateKey(wallet.privateKey);
       await storeWalletAddress(wallet.address);
+
+      // Best-effort: register imported wallet with backend if available
+      try {
+        const network = (await getCurrentNetwork()) || 'ETHEREUM';
+        const isTestnet = await getIsTestnet();
+        await importBackendWallet({
+          address: wallet.address,
+          network,
+          isTestnet: !!isTestnet,
+        });
+      } catch (backendError) {
+        console.warn('Backend wallet registration failed (import):', backendError?.message);
+      }
 
       // Initialize wallet context
       initializeWallet(wallet.address, wallet.privateKey);

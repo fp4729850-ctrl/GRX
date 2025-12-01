@@ -8,6 +8,7 @@ import { CreateSnapshotDto, OracleSource } from './dto/create-snapshot.dto';
 import axios from 'axios';
 import { Decimal } from '@prisma/client/runtime/library';
 import { ethers } from 'ethers';
+import { v4 as uuidv4 } from 'uuid';
 
 @Injectable()
 export class OraclesService {
@@ -203,13 +204,14 @@ export class OraclesService {
       // Create snapshot
       const snapshot = await this.prisma.oracle_snapshots.create({
         data: {
+          id: uuidv4(),
           timestamp: new Date(),
           blockNumber: blockNumber || (dto.blockNumber ? BigInt(dto.blockNumber) : null),
           goldPriceUSD: new Decimal(dto.goldPriceUSD),
           fxRates: dto.fxRates,
           signature,
           source: dto.source,
-        },
+        } as any,
       });
 
       this.logger.log(`Oracle snapshot created: ${snapshot.id} from ${dto.source}`);
