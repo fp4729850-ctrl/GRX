@@ -276,12 +276,18 @@ const SendScreen = ({ navigation }) => {
               value={searchValue}
               onChangeText={onSearchChange}
               placeholder="Search country or currency"
+              autoFocus={false}
             />
-            <View style={styles.dropdownList}>
+            <ScrollView 
+              style={styles.dropdownList}
+              nestedScrollEnabled={true}
+              keyboardShouldPersistTaps="handled"
+            >
               {filteredOptions.map((option) => (
                 <TouchableOpacity
                   key={option.code}
                   style={styles.dropdownOption}
+                  activeOpacity={0.7}
                   onPress={() => {
                     onSelect(option.code);
                     handleDropdownToggle(type, false);
@@ -291,7 +297,7 @@ const SendScreen = ({ navigation }) => {
                   <Text style={styles.dropdownOptionText}>{option.label}</Text>
                 </TouchableOpacity>
               ))}
-            </View>
+            </ScrollView>
           </View>
         )}
       </View>
@@ -1097,6 +1103,7 @@ const styles = StyleSheet.create({
   dropdownContainer: {
     flex: 1,
     position: 'relative',
+    zIndex: 1000,
   },
   dropdownLabel: {
     fontSize: 12,
@@ -1124,9 +1131,10 @@ const styles = StyleSheet.create({
     borderRadius: theme.borderRadius.md,
     borderWidth: 1,
     borderColor: theme.colors.border,
-    maxHeight: 220,
-    zIndex: 1000,
-    ...theme.shadows.small,
+    maxHeight: 250,
+    zIndex: 10000,
+    elevation: 20,
+    ...theme.shadows.medium,
   },
   dropdownSearch: {
     borderBottomWidth: 1,
@@ -1135,20 +1143,15 @@ const styles = StyleSheet.create({
     paddingVertical: theme.spacing.xs,
   },
   dropdownList: {
-    maxHeight: 160,
-    ...Platform.select({
-      web: {
-        overflowY: 'auto',
-        WebkitOverflowScrolling: 'touch',
-      },
-      default: {},
-    }),
+    maxHeight: 200,
   },
   dropdownOption: {
-    paddingVertical: theme.spacing.sm,
+    paddingVertical: theme.spacing.md,
     paddingHorizontal: theme.spacing.sm,
     borderBottomWidth: 1,
     borderBottomColor: theme.colors.border,
+    minHeight: 44,
+    justifyContent: 'center',
   },
   dropdownOptionText: {
     color: theme.colors.text,

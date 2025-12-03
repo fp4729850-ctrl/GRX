@@ -1,23 +1,20 @@
 import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
-import * as Keychain from 'react-native-keychain';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { STORAGE_KEYS } from '../utils/constants';
 
 const isWeb = Platform.OS === 'web';
 
 /**
- * Store mnemonic securely using Keychain (most secure) or AsyncStorage (web)
+ * Store mnemonic securely using SecureStore (Android/iOS) or AsyncStorage (web)
  */
 export const storeMnemonic = async (mnemonic) => {
   try {
     if (isWeb) {
       await AsyncStorage.setItem(STORAGE_KEYS.MNEMONIC, mnemonic);
     } else {
-      await Keychain.setGenericPassword('mnemonic', mnemonic, {
-        service: 'grx_wallet_mnemonic',
-        accessible: Keychain.ACCESSIBLE.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
-      });
+      // Use Expo SecureStore for Android/iOS (more reliable than react-native-keychain)
+      await SecureStore.setItemAsync(STORAGE_KEYS.MNEMONIC, mnemonic);
     }
     return true;
   } catch (error) {
@@ -34,10 +31,8 @@ export const getMnemonic = async () => {
     if (isWeb) {
       return await AsyncStorage.getItem(STORAGE_KEYS.MNEMONIC);
     } else {
-      const credentials = await Keychain.getGenericPassword({
-        service: 'grx_wallet_mnemonic',
-      });
-      return credentials ? credentials.password : null;
+      // Use Expo SecureStore for Android/iOS
+      return await SecureStore.getItemAsync(STORAGE_KEYS.MNEMONIC);
     }
   } catch (error) {
     console.error('Error retrieving mnemonic:', error);
@@ -330,7 +325,8 @@ export const clearAllData = async () => {
         STORAGE_KEYS.CUSTODIAL_MODE,
       ]);
     } else {
-      await Keychain.resetGenericPassword({ service: 'grx_wallet_mnemonic' });
+      // Use SecureStore for all items (including mnemonic)
+      await SecureStore.deleteItemAsync(STORAGE_KEYS.MNEMONIC);
       await SecureStore.deleteItemAsync(STORAGE_KEYS.PRIVATE_KEY);
       await SecureStore.deleteItemAsync(STORAGE_KEYS.WALLET_ADDRESS);
       await SecureStore.deleteItemAsync(STORAGE_KEYS.PIN_HASH);

@@ -30,9 +30,26 @@ const UnlockScreen = ({ onUnlock }) => {
   const pinInputRef = useRef(null);
 
   useEffect(() => {
+    checkPINExists();
     checkBiometric();
     pinInputRef.current?.focus();
   }, []);
+
+  const checkPINExists = async () => {
+    try {
+      const pinHash = await getPINHash();
+      // If PIN is not set up, directly unlock (no PIN required)
+      if (!pinHash) {
+        console.log('No PIN set up, unlocking directly');
+        onUnlock();
+        return;
+      }
+    } catch (error) {
+      console.error('Error checking PIN:', error);
+      // If error checking PIN, unlock anyway to avoid blocking user
+      onUnlock();
+    }
+  };
 
   const checkBiometric = async () => {
     if (isWeb) return; // Biometric not available on web
@@ -79,6 +96,12 @@ const UnlockScreen = ({ onUnlock }) => {
 
     try {
       const storedPIN = await getPINHash();
+      // If PIN is not set up, directly unlock
+      if (!storedPIN) {
+        onUnlock();
+        return;
+      }
+      
       if (pin === storedPIN) {
         setPin('');
         onUnlock();
@@ -88,7 +111,9 @@ const UnlockScreen = ({ onUnlock }) => {
         pinInputRef.current?.focus();
       }
     } catch (error) {
-      Alert.alert('Error', 'Failed to verify PIN');
+      console.error('Error verifying PIN:', error);
+      // If error, unlock anyway to avoid blocking user
+      onUnlock();
     }
   };
 

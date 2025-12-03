@@ -1,221 +1,49 @@
+// This Pine Script® code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © fp4729850
+
+// This Pine Script® code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © hemingpatel355 - Final Full & Corrected Version
 //@version=5
-//@strategy_alert_message {{strategy.order.alert_message}}
-strategy('HPV5', overlay=false, process_orders_on_close = true,max_labels_count = 500,calc_on_order_fills = false, alert_message = "{{strategy.order.alert_message}}")
 
-var float entryPrice            = na
-var quantity_per                = array.new<float>(1,1)
-var startCountBool              = array.new<bool>(1,false)
-var float buystoploss_val       = na
-var float sellstoploss_val      = na
-var float TP0_V                 = na
-var float TP1_V                 = na
-var float TP2_V                 = na
-var float TP3_V                 = na
-var float TP4_V                 = na
-var float TP5_V                 = na
-var float TP6_V                 = na
-var float TP7_V                 = na
-var float TP8_V                 = na
-var float TP9_V                 = na
-var float TP10_V                = na
-var float TP11_V                = na
-var float TP12_V                = na
-var string quantity             = na
-var int candle_count            = 0
-var float newEntryPrice         = na
-var int NewTradesCount          = 0
-var buy_happens                 = array.new<bool>(1,false)
-var sell_happens                = array.new<bool>(1,false)
-var buyTargetArr                = array.new<bool>(12,false)
-var sellTargetArr               = array.new<bool>(12,false)
-var emaArr                      = map.new<string,float>()
+strategy('HP', overlay=false, default_qty_value=15,process_orders_on_close = true,max_labels_count = 500,calc_on_order_fills = false, alert_message = "{{strategy.order.alert_message}}")
 
-symbol = input('ETHUSDT')
-margin = input("20")
+var float entryPrice        = na
+var quantity_per            = array.new<float>(1,1)
+var startCountBool          = array.new<bool>(1,false)
+var float buystoploss_val   = na
+var float sellstoploss_val  = na
+var float TP0_V             = na
+var float TP1_V             = na
+var float TP2_V             = na
+var float TP3_V             = na
+var float TP4_V             = na
+var float TP5_V             = na
+var float TP6_V             = na
+var float TP7_V             = na
+var float TP8_V             = na
+var float TP9_V             = na
+var float TP10_V            = na
+var float TP11_V            = na
+var float TP12_V            = na
+var string quantity         = na
+var int candle_count        = 0
+var float newEntryPrice     = na
+var int NewTradesCount      = 0
+var buy_happens             = array.new<bool>(1,false)
+var sell_happens            = array.new<bool>(1,false)
+var buyTargetArr            = array.new<bool>(12,false)
+var sellTargetArr           = array.new<bool>(12,false)
+var emaArr                  = map.new<string,float>()
 
-apply_rsiStoch                  = input.bool(defval = true,title = 'Entry Based on RSI+Stoch')
-apply_scalper_pro               = input.bool(defval = false,title = 'Entry Based on Scalper-pro')
-
-
-entry_on_type2                  = input.bool(defval = true,title = 'Allow entry based on indicators: SHA,Z-Score,HACOLT,Supertrend',group = 'z-score entry')
-len                             = input.int(75, "Lookback Length",group = 'z-score entry')
-upperlevel                      = input.float(defval = 3,title = 'UpperLevel',group = 'z-score entry')
-lowerlevel                      = input.float(defval = -3,title = 'LowerLevel',group = 'z-score entry')
-
-entry_on_sha                    = input.bool(defval = false, title = 'SHA',inline = '1111',group = 'Type2 Entry')
-entry_on_zscore                 = true//input.bool(defval = true, title = 'Z-Score',inline = '1111',group = 'Type2 Entry')
-entry_on_hacolt                 = input.bool(defval = false, title = 'HACOLT',inline = '1111',group = 'Type2 Entry')
-entry_on_super                  = true//input.bool(defval = true, title = 'Supertrend',inline = '1111',group = 'Type2 Entry')
-candle_gap_from_zscore          = input.int(defval = 10,title = 'Candle Gap allowed from z-score',group = 'z-score entry')
-
-
-block_entry                     = false//input.bool(defval = false, title = 'block entry until next new opposite signal comes')
-lineBasedEntry                  = input.bool(defval = false, title = 'Entry On Line Based',group = 'Line Based Entry')
-alowwed_entry_on_cloud          = input.bool(defval = false, title = 'Allow only one trade per supertrend cloud',group = 'Line Based Entry')
-
-
-BuyLineBuffer                   = input.float(defval = 1, title = 'Buffer for line in % : Buy',inline = 'fffff',group = 'Line Based Entry') * 0.01
-SellLineBuffer                  = input.float(defval = 1, title = 'Sell',inline = 'fffff',group = 'Line Based Entry')* 0.01
-apply_ema                       = input.bool(defval = false, title = 'Apply Ema on Entry ?',group = 'EMA Based Entry')
-ema1Len                         = input.int(defval = 30,title = 'Lower Ema',group = 'EMA Based Entry')
-ema2Len                         = input.int(defval = 90,title = 'Higher Ema',group = 'EMA Based Entry')
-rsi_apply                       = input.bool(defval = false,title = 'Apply Rsi On Entry',group = 'RSI Based Entry')
-up_value                        = input.float(defval = 70,title = 'Upper Value',group = 'RSI Based Entry')
-dn_value                        = input.float(defval = 30,title = 'Lower Value',group = 'RSI Based Entry')
-apply_trendDirection            = input.bool(defval = false,title = 'Apply Rsi Supertrend',group = 'RSI Based Entry')
-apply_tmo                       = input.bool(defval = false,title = 'Entry Based on TMO',group = 'TMO Based Entry')
-
-
-// //RSI+Stoch
-
-// === INPUTS ===
-groupRSI    = "RSI+Stoch"
-rsiLen      = input.int(14, "RSI Length", group=groupRSI)
-rsiBuyLvl   = input.int(40, "RSI Buy Threshold", group=groupRSI)
-rsiSellLvl  = input.int(60, "RSI Sell Threshold", group=groupRSI)
-stochLen    = input.int(14, "Stochastic %K Length", group=groupRSI)
-smoothK     = input.int(3,  "Stochastic K Smoothing", group=groupRSI)
-smoothD     = input.int(3,  "Stochastic D Smoothing", group=groupRSI)
-
-
-// === CALCULATIONS ===
-rsi11 = ta.rsi(close, rsiLen)
-
-lowestLow11   = ta.lowest(low, stochLen)
-highestHigh11 = ta.highest(high, stochLen)
-stochRange11  = math.max(highestHigh11 - lowestLow11, 1e-10)
-rawK = (close - lowestLow11) / stochRange11 * 100.0
-k11 = ta.sma(rawK, smoothK)
-d11 = ta.sma(k11, smoothD)
-
-// === SIGNAL LOGIC ===
-// Arrow signals (exactly when arrows appear)
-buySignalRsiStoch  = ta.crossover(k11, d11) and k11 < 20 and rsi11 < rsiBuyLvl
-sellSignalRsiStoch = ta.crossunder(k11, d11) and k11 > 80 and rsi11 > rsiSellLvl
-
-// // === PLOTTING ARROWS ===
-// plotshape must be in global scope; use boolean series to control visibility
-plotshape(apply_rsiStoch ? buySignalRsiStoch : na ,  title="BUY Signal",  location=location.belowbar, color=color.new(color.green,0),  style=shape.triangleup,   size=size.small,force_overlay = true)
-plotshape(apply_rsiStoch ? sellSignalRsiStoch: na , title="SELL Signal", location=location.abovebar, color=color.new(color.red,0),    style=shape.triangledown, size=size.small,force_overlay = true)
-
-
-
-///
-
-var float nsensitivity = 1
-// Signal Generation
-// Signal Generation Function
-supertrend(_src, factor, atrLen) =>
-    atr = ta.atr(atrLen)
-    upperBand = _src + factor * atr
-    lowerBand = _src - factor * atr
-    prevLowerBand = nz(lowerBand[1])
-    prevUpperBand = nz(upperBand[1])
-    lowerBand := lowerBand > prevLowerBand or close[1] < prevLowerBand ? lowerBand : prevLowerBand
-    upperBand := upperBand < prevUpperBand or close[1] > prevUpperBand ? upperBand : prevUpperBand
-    var int direction = na
-    var float superTrend = na
-    prevSuperTrend = nz(superTrend[1])
-    
-    if na(atr[1])
-        direction := 1
-    else if prevSuperTrend == prevUpperBand
-        direction := close > upperBand ? -1 : 1
-    else
-        direction := close < lowerBand ? 1 : -1
-    
-    superTrend := direction == -1 ? lowerBand : upperBand
-    [superTrend, direction]
-
-[supertrend11, direction11] = supertrend(close, nsensitivity*7,10)
-//señales
-bull11 = ta.crossover(close, supertrend11) 
-bear11 = ta.crossunder(close, supertrend11) 
-  
-plotshape(apply_scalper_pro ? bull11 : na ,style = shape.circle,color = #01f709e3,location = location.belowbar,force_overlay = true,size = size.small)
-plotshape(apply_scalper_pro ? bear11 : na ,style = shape.circle,color = color.rgb(247, 1, 1, 13),location = location.abovebar,force_overlay = true,size = size.small)
-
-
-
-// SHA 
-import wallneradam/TAExt/8
-//
-// User inputs
-//
-ha_smooth_length = input.int(10, "Smooth Length", minval=1, group="SHA")
-ha_smooth_ma_type = input.string('EMA', 'MA Type', options=['SMA', 'EMA', 'WMA', "VWMA", "RMA", "DEMA", "TEMA", "ZLEMA", "HMA", "ALMA", "LSMA", "SWMA", "SMMA", "JMA", "DONCHIAN", "ATRWSMA", "ATRWEMA", "ATRWRMA", "ATRWWMA"], group="SHA")
-ha_after_smooth_length = input.int(10, "After Smooth Length", minval=1, group="SHA")      
-ha_after_smooth_ma_type = input.string('EMA', 'After MA Type', options=['SMA', 'EMA', 'WMA', "VWMA", "RMA", "DEMA", "TEMA", "ZLEMA", "HMA", "ALMA", "LSMA", "SWMA", "SMMA", "JMA", "DONCHIAN", "ATRWSMA", "ATRWEMA", "ATRWRMA", "ATRWWMA"], group="SHA")
-
-//
-// Calculation
-//
-[o, h, l, c] = TAExt.heiken_ashi(smooth_length=ha_smooth_length, smooth_ma_type=ha_smooth_ma_type, after_smooth_length=ha_after_smooth_length, after_smooth_ma_type=ha_after_smooth_ma_type)
-
-//
-// Plotting
-//
-plotcandle(o, h, l, c, title="SHA", 
-         color=entry_on_sha ? o > c ? color.new(color.red, 60) : color.new(color.lime, 60) : #4caf4f00, 
-         wickcolor=entry_on_sha ? o > c ? color.new(color.red, 20) : color.new(color.lime, 20) : #4caf4f00, 
-         bordercolor=entry_on_sha ? o > c ? color.new(color.red, 10) : color.new(color.lime, 10) : #4caf4f00,force_overlay=true)
-
-
-
-green_sha = c > o 
-red_sha = c < o
-
-
-
-
-
-// HACOLT
-lengthHac = input(defval=55, title="TEMA Period",group = 'HACOLT')
-emaLength = input(defval=60, title="EMA Period",group = 'HACOLT')
-candleSizeFactor = input(defval=1.1, title="Candle size factor",group = 'HACOLT')
-overlayMode=input(false)
-calc_tema(src, lengthHac) =>
-	ema1 = ta.ema(src, lengthHac)
-	ema2 = ta.ema(ema1, lengthHac)
-	ema3 = ta.ema(ema2, lengthHac)
-	3 * (ema1 - ema2) + ema3
-
-var float haOpen = na 
-haOpen := nz((haOpen[1] + ohlc4) / 2, ohlc4)
-haClose = (haOpen + math.max(high, haOpen) +  math.min(low, haOpen) + ohlc4) / 4
-thaClose = calc_tema(haClose, lengthHac)
-thl2 = calc_tema(hl2, lengthHac)
-haCloseSmooth = 2 * thaClose - calc_tema(thaClose, lengthHac)
-hl2Smooth = 2 * thl2 - calc_tema(thl2, lengthHac)
-shortCandle =  math.abs(close - open) < ((high - low) * candleSizeFactor)
-keepn1 = ((haClose >= haOpen) and (haClose[1] >= haOpen[1])) or (close >= haClose) or (high > high[1]) or (low > low[1]) or (hl2Smooth >= haCloseSmooth)
-keepall1 = keepn1 or (keepn1[1] and (close >= open) or (close >= close[1]))
-keep13 = shortCandle and (high >= low[1])
-utr = keepall1 or (keepall1[1] and keep13)
-keepn2 = (haClose < haOpen) and (haClose[1] < haOpen[1]) or (hl2Smooth < haCloseSmooth)
-keep23 = shortCandle and (low <= high[1])
-keepall2 = keepn2 or (keepn2[1] and (close < open) or (close < close[1]))
-dtr = keepall2 or (keepall2[1] and keep23)
-upw = dtr == 0 and dtr[1] and utr
-dnw = utr == 0 and utr[1] and dtr
-
-var bool upwWithOffset = na 
-upwWithOffset := upw != dnw ? upw : nz(upwWithOffset[1])
-
-buySig = upw or (not dnw and (na(upwWithOffset) ? 0 : upwWithOffset))
-ltSellSig = close < ta.ema(close, emaLength)
-
-var bool neutralSig = na 
-neutralSig := buySig or (ltSellSig ? 0 : nz(neutralSig[1]))
-hacolt = buySig ? 1 : neutralSig ? 0 : -1
-// plot(not overlayMode ? hacolt : na, style=plot.style_columns, color=hacolt>0?color.green:hacolt<0?color.red:color.blue, title="HACOLT")
-// barcolor(overlayMode?hacolt>0?color.green:hacolt<0?color.red:color.blue:na)
-
-green_hacolt    = hacolt>0
-red_hacolt      = hacolt<0
-
-
-
+block_entry                     = false//input.bool(defval = false, title = 'block entry until next new opposite signal comes')
+alowwed_entry_on_cloud          = input.bool(defval = true, title = 'Allow only one trade per supertrend cloud')
+lineBasedEntry                  = input.bool(defval = true, title = 'Entry On Line Based')
+BuyLineBuffer                   = input.float(defval = 1, title = 'Buffer for line in % : Buy',inline = 'fffff') * 0.01
+SellLineBuffer                  = input.float(defval = 1, title = 'Sell',inline = 'fffff') * 0.01
+apply_ema                       = input.bool(defval = true, title = 'Apply Ema on Entry ?')
+ema1Len                         = input.int(defval = 30,title = 'Lower Ema')
+ema2Len                         = input.int(defval = 90,title = 'Higher Ema')
+rsi_apply                       = input.bool(defval = true,title = 'Apply Rsi On Entry')
 
 
 ema1 = ta.ema(close,ema1Len)
@@ -225,138 +53,138 @@ plot(apply_ema ? ema1 : na ,title = 'Lower Ema',color = color.orange,force_overl
 plot(apply_ema ? ema2 : na ,title = 'Higher Ema',color = color.blue,force_overlay = true)
 
 
-tmolength                       = input(21, title='TMO Len',group = 'TMO',inline = '1')
-calcLength                      = input(5, title='Calc Len',group = 'TMO',inline = '1')
-smoothLength                    = input(3, title='Smooth Len',group = 'TMO',inline = '1')
-ttmsqlength                     = input.int(title='TTM Squeeze Length', defval=20, minval=0,group = 'TMO',inline = '1')
+tmolength                       = input(21, title='TMO Len',group = 'TMO',inline = '1')
+calcLength                      = input(5, title='Calc Len',group = 'TMO',inline = '1')
+smoothLength                    = input(3, title='Smooth Len',group = 'TMO',inline = '1')
+ttmsqlength                     = input.int(title='TTM Squeeze Length', defval=20, minval=0,group = 'TMO',inline = '1')
 
-relativeStrengthIndexLength     = input.int(14, title="RSI Len", group="RSI Settings",inline = '1')
-smoothingLength                 = input.int(21, title="RSI Smoothing Len", group="RSI Settings",inline = '1')
-rsiInputSource                  = input.source(close, title="RSI Source", group="RSI Settings",inline = '1')
-isSmoothed                      = input.bool(false, "Smooth RSI?", group="RSI Settings",inline = '1')
-movingAverageLength             = input.int(14, title="MA Length", group="MA Settings", display = display.data_window,inline = '1')
-movingAverageType               = input.string("HMA", title="MA Type", options=["SMA", "HMA", "EMA", "SMMA (RMA)", "WMA", "VWMA"], group="MA Settings", display = display.data_window,inline = '1')
-showMovingAverage               = input.bool(true, "Show RSI MA?", group="MA Settings",inline = '1')
-trendFactor                     = input.float(0.8, title="Factor", group="Super Trend Settings",inline = '1')
-averageTrueRangeLength          = input.int(10, title="ATR Length", group="Super Trend Settings",inline = '1')
-colorUp                         = input.color(#00ffbb, title="Up Color",inline = '1')
-colorDown                       = input.color(#ff1100, title="Down Color",inline = '1')
+relativeStrengthIndexLength     = input.int(14, title="RSI Len", group="RSI Settings",inline = '1')
+smoothingLength                 = input.int(21, title="RSI Smoothing Len", group="RSI Settings",inline = '1')
+rsiInputSource                  = input.source(close, title="RSI Source", group="RSI Settings",inline = '1')
+isSmoothed                      = input.bool(false, "Smooth RSI?", group="RSI Settings",inline = '1')
+movingAverageLength             = input.int(14, title="MA Length", group="MA Settings", display = display.data_window,inline = '1')
+movingAverageType               = input.string("HMA", title="MA Type", options=["SMA", "HMA", "EMA", "SMMA (RMA)", "WMA", "VWMA"], group="MA Settings", display = display.data_window,inline = '1')
+showMovingAverage               = input.bool(true, "Show RSI MA?", group="MA Settings",inline = '1')
+trendFactor                     = input.float(0.8, title="Factor", group="Super Trend Settings",inline = '1')
+averageTrueRangeLength          = input.int(10, title="ATR Length", group="Super Trend Settings",inline = '1')
+colorUp                         = input.color(#00ffbb, title="Up Color",inline = '1')
+colorDown                       = input.color(#ff1100, title="Down Color",inline = '1')
 
-var string calcGroup            = 'Calculation'
-length                          = input.int(title='ATR Period', defval=11, group=calcGroup)
-mult                            = input.float(title='ATR Multiplier', step=0.1, defval=11, group=calcGroup)
-useClose                        = input.bool(title='Use Close Price for Extremums', defval=true, group=calcGroup)
-var string visualGroup          = 'Visuals'
-showLabels                      = input.bool(title='Show Buy/Sell Labels', defval=true, group=visualGroup)
-highlightState                  = input.bool(title='Highlight State', defval=true, group=visualGroup)
-var string alertGroup           = 'Alerts'
-awaitBarConfirmation            = input.bool(title="Await Bar Confirmation", defval=true, group=alertGroup)
+var string calcGroup            = 'Calculation'
+length                          = input.int(title='ATR Period', defval=11, group=calcGroup)
+mult                            = input.float(title='ATR Multiplier', step=0.1, defval=11, group=calcGroup)
+useClose                        = input.bool(title='Use Close Price for Extremums', defval=true, group=calcGroup)
+var string visualGroup          = 'Visuals'
+showLabels                      = input.bool(title='Show Buy/Sell Labels', defval=true, group=visualGroup)
+highlightState                  = input.bool(title='Highlight State', defval=true, group=visualGroup)
+var string alertGroup           = 'Alerts'
+awaitBarConfirmation            = input.bool(title="Await Bar Confirmation", defval=true, group=alertGroup)
 
-PercType                    = 'Mannual'
-PercTypeIn                  = PercType == 'Mannual' ? 1 : 0
+PercType                    = 'Mannual'
+PercTypeIn                  = PercType == 'Mannual' ? 1 : 0
 
-grop_per                   = 'Mannual USDT Amount Settings'
-symName                     = input.string(defval = 'BTCUSDT',title = 'Symbol Name (e.g., BTCUSDT)',group = grop_per)
-qty_type                    = input.string(defval = 'USDT',title = 'Qty Type',options = ['USDT', '%','qty'],group = grop_per)
-signalId_input              = input.string(defval = 'YOUR_UNIQUE_SIGNAL_ID_HERE',title = 'Signal ID',group = grop_per)
-uid_input                   = input.string(defval = 'YOUR_UNIQUE_USER_ID_HERE',title = 'User ID (uid)',group = grop_per)
-startPerAfterLoss_En        = input.bool(defval = true, title = 'Enable Martingale',group = grop_per,inline = '11')
-startPerAfterLoss           = input.float(defval = 2,title = 'Starts After x% Loss',group = grop_per,inline = '11')
-Perc1_En                    = input.bool(defval = true, title = '',inline = '1',group = grop_per)
-Perc1_input                 = input.string(defval = '50',title = 'USDT for trade-1 ',inline = '1',group = grop_per)
-Perc2_En                    = input.bool(defval = true, title = '',inline = '1',group = grop_per)
-Perc2_input                 = input.string(defval = '60',title = 'USDT for trade-2 ',inline = '1',group = grop_per)
-Perc3_En                    = input.bool(defval = true, title = '',inline = '2',group = grop_per)
-Perc3_input                 = input.string(defval = '70',title = 'USDT for trade-3 ',inline = '2',group = grop_per)
-Perc4_En                    = input.bool(defval = true, title = '',inline = '2',group = grop_per)
-Perc4_input                 = input.string(defval = '80',title = 'USDT for trade-4 ',inline = '2',group = grop_per)
-Perc5_En                    = input.bool(defval = true, title = '',inline = '3',group = grop_per)
-Perc5_input                 = input.string(defval = '90',title = 'USDT for trade-5 ',inline = '3',group = grop_per)
-Perc6_En                    = input.bool(defval = true, title = '',inline = '3',group = grop_per)
-Perc6_input                 = input.string(defval = '100',title = 'USDT for trade-6 ',inline = '3',group = grop_per)
-Perc7_En                    = input.bool(defval = true, title = '',inline = '4',group = grop_per)
-Perc7_input                 = input.string(defval = '50',title = 'USDT for trade-7 ',inline = '4',group = grop_per)
-Perc8_En                    = input.bool(defval = true, title = '',inline = '4',group = grop_per)
-Perc8_input                 = input.string(defval = '60',title = 'USDT for trade-8 ',inline = '4',group = grop_per)
-Perc9_En                    = input.bool(defval = true, title = '',inline = '5',group = grop_per)
-Perc9_input                 = input.string(defval = '70',title = 'USDT for trade-9 ',inline = '5',group = grop_per)
-Perc10_En                   = input.bool(defval = true, title = '',inline = '5',group = grop_per)
-Perc10_input                = input.string(defval = '80',title = 'USDT for trade-10 ',inline = '5',group = grop_per)
-Perc11_En                   = input.bool(defval = true, title = '',inline = '10',group = grop_per)
-Perc11_input                = input.string(defval = '90',title = 'USDT for trade-11 ',inline = '10',group = grop_per)
-Perc12_En                   = input.bool(defval = true, title = '',inline = '10',group = grop_per)
-Perc12_input                = input.string(defval = '100',title = 'USDT for trade-12 ',inline = '10',group = grop_per)
+grop_per                   = 'Mannual USDT Amount Settings'
+symName                     = input.string(defval = 'BTCUSDT',title = 'Symbol Name (e.g., BTCUSDT)',group = grop_per)
+qty_type                    = input.string(defval = 'USDT',title = 'Qty Type',options = ['USDT', '%','qty'],group = grop_per)
+signalId_input              = input.string(defval = 'YOUR_UNIQUE_SIGNAL_ID_HERE',title = 'Signal ID',group = grop_per)
+uid_input                   = input.string(defval = 'YOUR_UNIQUE_USER_ID_HERE',title = 'User ID (uid)',group = grop_per)
+startPerAfterLoss_En        = input.bool(defval = true, title = 'Enable Martingale',group = grop_per,inline = '11')
+startPerAfterLoss           = input.float(defval = 2,title = 'Starts After x% Loss',group = grop_per,inline = '11')
+Perc1_En                    = input.bool(defval = true, title = '',inline = '1',group = grop_per)
+Perc1_input                 = input.string(defval = '50',title = 'USDT for trade-1 ',inline = '1',group = grop_per)
+Perc2_En                    = input.bool(defval = true, title = '',inline = '1',group = grop_per)
+Perc2_input                 = input.string(defval = '60',title = 'USDT for trade-2 ',inline = '1',group = grop_per)
+Perc3_En                    = input.bool(defval = true, title = '',inline = '2',group = grop_per)
+Perc3_input                 = input.string(defval = '70',title = 'USDT for trade-3 ',inline = '2',group = grop_per)
+Perc4_En                    = input.bool(defval = true, title = '',inline = '2',group = grop_per)
+Perc4_input                 = input.string(defval = '80',title = 'USDT for trade-4 ',inline = '2',group = grop_per)
+Perc5_En                    = input.bool(defval = true, title = '',inline = '3',group = grop_per)
+Perc5_input                 = input.string(defval = '90',title = 'USDT for trade-5 ',inline = '3',group = grop_per)
+Perc6_En                    = input.bool(defval = true, title = '',inline = '3',group = grop_per)
+Perc6_input                 = input.string(defval = '100',title = 'USDT for trade-6 ',inline = '3',group = grop_per)
+Perc7_En                    = input.bool(defval = true, title = '',inline = '4',group = grop_per)
+Perc7_input                 = input.string(defval = '50',title = 'USDT for trade-7 ',inline = '4',group = grop_per)
+Perc8_En                    = input.bool(defval = true, title = '',inline = '4',group = grop_per)
+Perc8_input                 = input.string(defval = '60',title = 'USDT for trade-8 ',inline = '4',group = grop_per)
+Perc9_En                    = input.bool(defval = true, title = '',inline = '5',group = grop_per)
+Perc9_input                 = input.string(defval = '70',title = 'USDT for trade-9 ',inline = '5',group = grop_per)
+Perc10_En                   = input.bool(defval = true, title = '',inline = '5',group = grop_per)
+Perc10_input                = input.string(defval = '80',title = 'USDT for trade-10 ',inline = '5',group = grop_per)
+Perc11_En                   = input.bool(defval = true, title = '',inline = '10',group = grop_per)
+Perc11_input                = input.string(defval = '90',title = 'USDT for trade-11 ',inline = '10',group = grop_per)
+Perc12_En                   = input.bool(defval = true, title = '',inline = '10',group = grop_per)
+Perc12_input                = input.string(defval = '100',title = 'USDT for trade-12 ',inline = '10',group = grop_per)
 
-grop_per_auto               = 'Auto Percentage Settings'
-initial_per                 = 50//input.float(defval = 50,title = '% for first trade',inline = '1',group = grop_per_auto)
-multiplier                  = 2//input.float(defval = 2,title = 'multiplier',group = grop_per_auto,inline = '1')
+grop_per_auto               = 'Auto Percentage Settings'
+initial_per                 = 50//input.float(defval = 50,title = '% for first trade',inline = '1',group = grop_per_auto)
+multiplier                  = 2//input.float(defval = 2,title = 'multiplier',group = grop_per_auto,inline = '1')
 
-stoploss_bool               = input.bool(defval = true,title = 'stoploss ?',group = 'stoploss settings',inline = '0')
-stoploss_val                = input.float(defval = 2,title = '',group = 'stoploss settings',inline = '0')
+stoploss_bool               = input.bool(defval = true,title = 'stoploss ?',group = 'stoploss settings',inline = '0')
+stoploss_val                = input.float(defval = 2,title = '',group = 'stoploss settings',inline = '0')
 
 TargetSettGrp = 'Target Settings'
-target_type_ex              = input.string(defval = 'Touch',title = 'Type',group = TargetSettGrp,inline = '011',options = ['Close','Touch'])
-target_type                 = input.string(defval = '%',title = 'Type',group = TargetSettGrp,inline = '011',options = ['%','Pts'])
-target_bool_0               = false//input.bool(defval = false,title = '',group = TargetSettGrp,inline = '01')
-target0                     =  0.1//input.float(defval = 0.1,title = 'yellowLine | Shift SL To EntryPrice',group = TargetSettGrp,inline = '01')
+target_type_ex              = input.string(defval = 'Touch',title = 'Type',group = TargetSettGrp,inline = '011',options = ['Close','Touch'])
+target_type                 = input.string(defval = '%',title = 'Type',group = TargetSettGrp,inline = '011',options = ['%','Pts'])
+target_bool_0               = false//input.bool(defval = false,title = '',group = TargetSettGrp,inline = '01')
+target0                     =  0.1//input.float(defval = 0.1,title = 'yellowLine | Shift SL To EntryPrice',group = TargetSettGrp,inline = '01')
 
-target_bool_1               = input.bool(defval = true,title = '',group = TargetSettGrp,inline = '1')
-target1                     = input.float(defval = 2,title = 'T-1',group = TargetSettGrp,inline = '1')
-target1_lot                 = 100//input.float(defval = 100,title = 'Book%',group = TargetSettGrp,inline = '1')
-target_bool_1_slShift       = false//input.bool(defval = true,title = 'Shift SL To EntryPrice',group = TargetSettGrp,inline = '1')
+target_bool_1               = input.bool(defval = true,title = '',group = TargetSettGrp,inline = '1')
+target1                     = input.float(defval = 2,title = 'T-1',group = TargetSettGrp,inline = '1')
+target1_lot                 = 100//input.float(defval = 100,title = 'Book%',group = TargetSettGrp,inline = '1')
+target_bool_1_slShift       = false//input.bool(defval = true,title = 'Shift SL To EntryPrice',group = TargetSettGrp,inline = '1')
 
-target_bool_2               = input.bool(defval = true,title = '',group = TargetSettGrp,inline = '1')
-target2                     = input.float(defval = 2.1,title = 'T-2',group = TargetSettGrp,inline = '1')
-target2_lot                 = 100//input.float(defval = 100,title = 'Book%',group = TargetSettGrp,inline = '2')
+target_bool_2               = input.bool(defval = true,title = '',group = TargetSettGrp,inline = '1')
+target2                     = input.float(defval = 2.1,title = 'T-2',group = TargetSettGrp,inline = '1')
+target2_lot                 = 100//input.float(defval = 100,title = 'Book%',group = TargetSettGrp,inline = '2')
 
-target_bool_3               = input.bool(defval = true,title = '',group = TargetSettGrp,inline = '1')
-target3                     = input.float(defval = 3.2,title = 'T-3',group = TargetSettGrp,inline = '1')
-target3_lot                 = 100//input.float(defval = 100,title = 'Book%',group = TargetSettGrp,inline = '3')
+target_bool_3               = input.bool(defval = true,title = '',group = TargetSettGrp,inline = '1')
+target3                     = input.float(defval = 3.2,title = 'T-3',group = TargetSettGrp,inline = '1')
+target3_lot                 = 100//input.float(defval = 100,title = 'Book%',group = TargetSettGrp,inline = '3')
 
-target_bool_4               = input.bool(defval = true,title = '',group = TargetSettGrp,inline = '2')
-target4                     = input.float(defval = 4.3,title = 'T-4',group = TargetSettGrp,inline = '2')
-target4_lot                 = 100//input.float(defval = 100,title = 'Book%',group = TargetSettGrp,inline = '4')
+target_bool_4               = input.bool(defval = true,title = '',group = TargetSettGrp,inline = '2')
+target4                     = input.float(defval = 4.3,title = 'T-4',group = TargetSettGrp,inline = '2')
+target4_lot                 = 100//input.float(defval = 100,title = 'Book%',group = TargetSettGrp,inline = '4')
 
-target_bool_5               = input.bool(defval = true,title = '',group = TargetSettGrp,inline = '2')
-target5                     = input.float(defval = 5.5,title = 'T-5',group = TargetSettGrp,inline = '2')
-target5_lot                 = 100//input.float(defval = 10,title = 'Book%',group = TargetSettGrp,inline = '5')
+target_bool_5               = input.bool(defval = true,title = '',group = TargetSettGrp,inline = '2')
+target5                     = input.float(defval = 5.5,title = 'T-5',group = TargetSettGrp,inline = '2')
+target5_lot                 = 100//input.float(defval = 10,title = 'Book%',group = TargetSettGrp,inline = '5')
 
-target_bool_6               = input.bool(defval = true,title = '',group = TargetSettGrp,inline = '2')
-target6                     = input.float(defval = 6.5,title = 'T-6',group = TargetSettGrp,inline = '2')
-target6_lot                 = 100//input.float(defval = 100,title = 'Book%',group = TargetSettGrp,inline = '6')
+target_bool_6               = input.bool(defval = true,title = '',group = TargetSettGrp,inline = '2')
+target6                     = input.float(defval = 6.5,title = 'T-6',group = TargetSettGrp,inline = '2')
+target6_lot                 = 100//input.float(defval = 100,title = 'Book%',group = TargetSettGrp,inline = '6')
 
-target_bool_7               = input.bool(defval = true,title = '',group = TargetSettGrp,inline = '3')
-target7                     = input.float(defval = 7,title = 'T-7',group = TargetSettGrp,inline = '3')
-target7_lot                 = 100//input.float(defval = 100,title = 'Book%',group = TargetSettGrp,inline = '7')
+target_bool_7               = input.bool(defval = true,title = '',group = TargetSettGrp,inline = '3')
+target7                     = input.float(defval = 7,title = 'T-7',group = TargetSettGrp,inline = '3')
+target7_lot                 = 100//input.float(defval = 100,title = 'Book%',group = TargetSettGrp,inline = '7')
 
-target_bool_8               = input.bool(defval = true,title = '',group = TargetSettGrp,inline = '3')
-target8                     = input.float(defval = 7.5,title = 'T-8',group = TargetSettGrp,inline = '3')
-target8_lot                 = 100//input.float(defval = 100,title = 'Book%',group = TargetSettGrp,inline = '8')
+target_bool_8               = input.bool(defval = true,title = '',group = TargetSettGrp,inline = '3')
+target8                     = input.float(defval = 7.5,title = 'T-8',group = TargetSettGrp,inline = '3')
+target8_lot                 = 100//input.float(defval = 100,title = 'Book%',group = TargetSettGrp,inline = '8')
 
-target_bool_9               = input.bool(defval = true,title = '',group = TargetSettGrp,inline = '3')
-target9                     = input.float(defval = 8,title = 'T-9',group = TargetSettGrp,inline = '3')
-target9_lot                 = 100//input.float(defval = 100,title = 'Book%',group = TargetSettGrp,inline = '9')
+target_bool_9               = input.bool(defval = true,title = '',group = TargetSettGrp,inline = '3')
+target9                     = input.float(defval = 8,title = 'T-9',group = TargetSettGrp,inline = '3')
+target9_lot                 = 100//input.float(defval = 100,title = 'Book%',group = TargetSettGrp,inline = '9')
 
-target_bool_10              = input.bool(defval = true,title = '',group = TargetSettGrp,inline = '4')
-target10                    = input.float(defval = 8.5,title = 'T-10',group = TargetSettGrp,inline = '4')
-target10_lot                = 100//input.float(defval = 100,title = 'Book%',group = TargetSettGrp,inline = '10')
+target_bool_10              = input.bool(defval = true,title = '',group = TargetSettGrp,inline = '4')
+target10                    = input.float(defval = 8.5,title = 'T-10',group = TargetSettGrp,inline = '4')
+target10_lot                = 100//input.float(defval = 100,title = 'Book%',group = TargetSettGrp,inline = '10')
 
-target_bool_11              = input.bool(defval = true,title = '',group = TargetSettGrp,inline = '4')
-target11                    = input.float(defval = 9.5,title = 'T-11',group = TargetSettGrp,inline = '4')
-target11_lot                = 100//input.float(defval = 100,title = 'Book%',group = TargetSettGrp,inline = '11')
+target_bool_11              = input.bool(defval = true,title = '',group = TargetSettGrp,inline = '4')
+target11                    = input.float(defval = 9.5,title = 'T-11',group = TargetSettGrp,inline = '4')
+target11_lot                = 100//input.float(defval = 100,title = 'Book%',group = TargetSettGrp,inline = '11')
 
-target_bool_12              = input.bool(defval = true,title = '',group = TargetSettGrp,inline = '4')
-target12                    = input.float(defval = 9.7,title = 'T-12',group = TargetSettGrp,inline = '4')
-target12_lot                = 100//input.float(defval = 100,title = 'Book%',group = TargetSettGrp,inline = '12')
+target_bool_12              = input.bool(defval = true,title = '',group = TargetSettGrp,inline = '4')
+target12                    = input.float(defval = 9.7,title = 'T-12',group = TargetSettGrp,inline = '4')
+target12_lot                = 100//input.float(defval = 100,title = 'Book%',group = TargetSettGrp,inline = '12')
 
 tmo_data() =>
-    _data = 0.0
-    for i = 1 to tmolength - 1 by 1
-        if close > open[i]
-            _data += 1
-        if close < open[i]
-            _data -= 1
-    _data
+    _data = 0.0
+    for i = 1 to tmolength - 1 by 1
+        if close > open[i]
+            _data += 1
+        if close < open[i]
+            _data -= 1
+    _data
 
 EMA5 = ta.ema(tmo_data(), calcLength)
 Main = ta.ema(EMA5, smoothLength)
@@ -364,9 +192,9 @@ Signal = ta.ema(Main, smoothLength)
 cBias = Main > Signal ? color.green : color.red
 
 bband(length, mult) =>
-    ta.sma(close, ttmsqlength) + mult * ta.stdev(close, length)
+    ta.sma(close, ttmsqlength) + mult * ta.stdev(close, length)
 keltner(length, mult) =>
-    ta.sma(close, ttmsqlength) + mult * ta.sma(ta.tr, length)
+    ta.sma(close, ttmsqlength) + mult * ta.sma(ta.tr, length)
 
 e1 = (ta.highest(high, ttmsqlength) + ta.lowest(low, ttmsqlength)) / 2 + ta.sma(close, ttmsqlength)
 osc = ta.linreg(close - e1 / 2, ttmsqlength, 0)
@@ -375,55 +203,55 @@ osc_color = osc[1] < osc[0] ? osc[0] >= 0 ? #00ffff : #cc00cc : osc[0] >= 0 ? #0
 mid_color = diff >= 0 ? #2aaf2f : color.red
 
 calculateMA(source, length, type) =>
-    switch type
-        "SMA" => ta.sma(source, length)
-        "HMA" => ta.hma(source, length)
-        "EMA" => ta.ema(source, length)
-        "SMMA (RMA)" => ta.rma(source, length)
-        "WMA" => ta.wma(source, length)
-        "VWMA" => ta.vwma(source, length)
+    switch type
+        "SMA" => ta.sma(source, length)
+        "HMA" => ta.hma(source, length)
+        "EMA" => ta.ema(source, length)
+        "SMMA (RMA)" => ta.rma(source, length)
+        "WMA" => ta.wma(source, length)
+        "VWMA" => ta.vwma(source, length)
 
 calculateATR(source, atrLength) =>
-    highestHigh = ta.highest(source, atrLength)
-    lowestLow = ta.lowest(source, atrLength)
-    trueRange = na(highestHigh[1]) ? highestHigh - lowestLow : math.max(highestHigh - lowestLow, math.abs(highestHigh - source[1]), math.abs(lowestLow - source[1]))
-    ta.rma(trueRange, atrLength)
+    highestHigh = ta.highest(source, atrLength)
+    lowestLow = ta.lowest(source, atrLength)
+    trueRange = na(highestHigh[1]) ? highestHigh - lowestLow : math.max(highestHigh - lowestLow, math.abs(highestHigh - source[1]), math.abs(lowestLow - source[1]))
+    ta.rma(trueRange, atrLength)
 
 calculateSupertrend(factor, atrPeriod, source) =>
-    priceSource = source
-    atr = calculateATR(source, atrPeriod)
-    upperBand = priceSource + factor * atr
-    lowerBand = priceSource - factor * atr
-    prevLowerBand = nz(lowerBand[1])
-    prevUpperBand = nz(upperBand[1])
-    lowerBand := lowerBand > prevLowerBand or source[1] < prevLowerBand ? lowerBand : prevLowerBand
-    upperBand := upperBand < prevUpperBand or source[1] > prevUpperBand ? upperBand : prevUpperBand
-    int trendDirection = na
-    float supertrendValue = na
-    prevSupertrend = supertrendValue[1]
-    if na(atr[1])
-        trendDirection := 1
-    else if prevSupertrend == prevUpperBand
-        trendDirection := source > upperBand ? -1 : 1
-    else
-        trendDirection := source < lowerBand ? 1 : -1
-    supertrendValue := trendDirection == -1 ? lowerBand : upperBand
-    [supertrendValue, trendDirection]
+    priceSource = source
+    atr = calculateATR(source, atrPeriod)
+    upperBand = priceSource + factor * atr
+    lowerBand = priceSource - factor * atr
+    prevLowerBand = nz(lowerBand[1])
+    prevUpperBand = nz(upperBand[1])
+    lowerBand := lowerBand > prevLowerBand or source[1] < prevLowerBand ? lowerBand : prevLowerBand
+    upperBand := upperBand < prevUpperBand or source[1] > prevUpperBand ? upperBand : prevUpperBand
+    int trendDirection = na
+    float supertrendValue = na
+    prevSupertrend = supertrendValue[1]
+    if na(atr[1])
+        trendDirection := 1
+    else if prevSupertrend == prevUpperBand
+        trendDirection := source > upperBand ? -1 : 1
+    else
+        trendDirection := source < lowerBand ? 1 : -1
+    supertrendValue := trendDirection == -1 ? lowerBand : upperBand
+    [supertrendValue, trendDirection]
 
 rsiValue = isSmoothed ? ta.hma(ta.rsi(rsiInputSource, relativeStrengthIndexLength), smoothingLength) : ta.rsi(rsiInputSource, relativeStrengthIndexLength)
 rsiMovingAverage = calculateMA(rsiValue, movingAverageLength, movingAverageType)
 [rsiSupertrend, trendDirection] = calculateSupertrend(trendFactor, averageTrueRangeLength, rsiValue)
-supertrendPlot = plot(apply_trendDirection ? rsiSupertrend :na, color = trendDirection == -1 ? colorUp : colorDown, title="rsiSupertrend")
-rsiPlot = plot(rsi_apply ? rsiValue : na, color = color.new(color.gray, 100), title="RSI")
-overboughtLine = plot(rsi_apply ? up_value : na , color = color.from_gradient(rsiValue, 50, 70, color.new(color.gray, 70), color.new(colorDown, 0)), title="Overbought Line", linewidth = 3)
-oversoldLine = plot(rsi_apply ? dn_value : na, color = color.from_gradient(rsiValue, 30, 50, color.new(colorUp, 0), color.new(color.gray, 70)), title="Oversold Line", linewidth = 3)
-plot(rsi_apply ? rsiMovingAverage : na , color = color.rgb(46, 47, 51), title = "RSI MA", display = showMovingAverage ? display.all : display.none, linewidth = 1)
-plot(rsi_apply ? 50 : na, color = color.gray, title="Mid Line")
+supertrendPlot = plot(rsiSupertrend, color = trendDirection == -1 ? colorUp : colorDown, title="Supertrend")
+rsiPlot = plot(rsiValue, color = color.new(color.gray, 100), title="RSI")
+overboughtLine = plot(70, color = color.from_gradient(rsiValue, 50, 70, color.new(color.gray, 70), color.new(colorDown, 0)), title="Overbought Line", linewidth = 3)
+oversoldLine = plot(30, color = color.from_gradient(rsiValue, 30, 50, color.new(colorUp, 0), color.new(color.gray, 70)), title="Oversold Line", linewidth = 3)
+plot(rsiMovingAverage, color = color.gray, title = "RSI MA", display = showMovingAverage ? display.all : display.none, linewidth = 1)
+plot(50, color = color.gray, title="Mid Line")
 fill(overboughtLine, oversoldLine, color = color.new(color.gray, 90), title="Overbought/Oversold Fill")
 fill(supertrendPlot, rsiPlot, color = trendDirection == 1 ? color.new(colorDown, 90) : color.new(colorUp, 90), title="Trend Fill")
 fill(supertrendPlot, rsiPlot, rsiValue, rsiSupertrend, color.new(chart.bg_color, 1000), trendDirection == 1 ? colorDown : colorUp)
-// plotshape(ta.crossover(rsiSupertrend, rsiValue) and rsiSupertrend > 70 ? 85 : na, style=shape.triangledown, location=location.absolute, color=colorDown, size=size.tiny, title="Crossover Down")
-// plotshape( ta.crossunder(rsiSupertrend, rsiValue) and rsiSupertrend < 30 ? 15 : na, style=shape.triangleup, location=location.absolute, color=colorUp, size=size.tiny, title="Crossunder Up")
+plotshape(ta.crossover(rsiSupertrend, rsiValue) and rsiSupertrend > 70 ? 85 : na, style=shape.triangledown, location=location.absolute, color=colorDown, size=size.tiny, title="Crossover Down")
+plotshape(ta.crossunder(rsiSupertrend, rsiValue) and rsiSupertrend < 30 ? 15 : na, style=shape.triangleup, location=location.absolute, color=colorUp, size=size.tiny, title="Crossunder Up")
 
 atr = mult * ta.atr(length)
 longStop = (useClose ? ta.highest(close, length) : ta.highest(length)) - atr
@@ -457,58 +285,61 @@ var bool up_rsi_touch = false
 var bool dn_rsi_touch = false
 up_sup = dir == 1
 dn_sup = dir == -1
-dn_rsi = dn_sup and rsiMovingAverage >= up_value and up_rsi_touch == false  and strategy.position_size == 0
+up_value = input.float(defval = 70,title = 'Upper Value')
+dn_value = input.float(defval = 30,title = 'Lower Value')
+dn_rsi = dn_sup and rsiMovingAverage >= up_value and up_rsi_touch == false  and strategy.position_size == 0
 if dn_rsi
-    up_rsi_touch:=true
-    dn_rsi_touch:=false
-up_rsi = up_sup and rsiMovingAverage <= dn_value and dn_rsi_touch == false  and strategy.position_size == 0
+    up_rsi_touch:=true
+    dn_rsi_touch:=false
+up_rsi = up_sup and rsiMovingAverage <= dn_value and dn_rsi_touch == false  and strategy.position_size == 0
 if up_rsi
-    dn_rsi_touch:=true
-    up_rsi_touch:=false
+    dn_rsi_touch:=true
+    up_rsi_touch:=false
 if dn_sup
-    dn_rsi_touch:=false
+    dn_rsi_touch:=false
 if up_sup
-    up_rsi_touch:=false
+    up_rsi_touch:=false
 up_tmo = Main > Signal and strategy.position_size == 0
 dn_tmo = Main <= Signal and strategy.position_size == 0
 
-
+buy_entry   = up_sup and (rsi_apply ? dn_rsi_touch : true ) and up_tmo  and strategy.position_size == 0
+sell_entry  = dn_sup and (rsi_apply ? up_rsi_touch : true ) and dn_tmo  and strategy.position_size == 0
 
 buyTp(targetVal)=>
-    target_type=='%'?close*(1+targetVal*0.01):close + targetVal
+    target_type=='%'?close*(1+targetVal*0.01):close + targetVal
 sellTp(targetVal)=>
-    target_type=='%'?close*(1-targetVal*0.01):close - targetVal
+    target_type=='%'?close*(1-targetVal*0.01):close - targetVal
 
 getUsdtAmount() =>
-    string q = ''
-    if PercTypeIn == 1
-        if quantity_per.get(0) == 1
-            q := Perc1_input
-        else if quantity_per.get(0) == 2
-            q := Perc2_input
-        else if quantity_per.get(0) == 3
-            q := Perc3_input
-        else if quantity_per.get(0) == 4
-            q := Perc4_input
-        else if quantity_per.get(0) == 5
-            q := Perc5_input
-        else if quantity_per.get(0) == 6
-            q := Perc6_input
-        else if quantity_per.get(0) == 7
-            q := Perc7_input
-        else if quantity_per.get(0) == 8
-            q := Perc8_input
-        else if quantity_per.get(0) == 9
-            q := Perc9_input
-        else if quantity_per.get(0) == 10
-            q := Perc10_input
-        else if quantity_per.get(0) == 11
-            q := Perc11_input
-        else if quantity_per.get(0) == 12
-            q := Perc12_input
-    else
-        q := str.tostring(quantity_per.get(0))
-    q
+    string q = ''
+    if PercTypeIn == 1
+        if quantity_per.get(0) == 1
+            q := Perc1_input
+        else if quantity_per.get(0) == 2
+            q := Perc2_input
+        else if quantity_per.get(0) == 3
+            q := Perc3_input
+        else if quantity_per.get(0) == 4
+            q := Perc4_input
+        else if quantity_per.get(0) == 5
+            q := Perc5_input
+        else if quantity_per.get(0) == 6
+            q := Perc6_input
+        else if quantity_per.get(0) == 7
+            q := Perc7_input
+        else if quantity_per.get(0) == 8
+            q := Perc8_input
+        else if quantity_per.get(0) == 9
+            q := Perc9_input
+        else if quantity_per.get(0) == 10
+            q := Perc10_input
+        else if quantity_per.get(0) == 11
+            q := Perc11_input
+        else if quantity_per.get(0) == 12
+            q := Perc12_input
+    else
+        q := str.tostring(quantity_per.get(0))
+    q
 
 syntaxFun(is_reduce_only)=>
     string usdt_amount_str = getUsdtAmount()
@@ -517,166 +348,90 @@ syntaxFun(is_reduce_only)=>
     alert_mesg
 
 var close_id = array.new<int>(1,0)
-
-// --- ENABLED TRADE TRACKING ---
-var int enabled_trade_count = 0  // Count of enabled trades executed in current sequence
-var bool waiting_for_tp = false  // Flag to wait for TP after 5th enabled trade
-
-// Function to check if a trade level checkbox is enabled
-isTradeEnabled(tradeNum) =>
-    if tradeNum == 1
-        Perc1_En
-    else if tradeNum == 2
-        Perc2_En
-    else if tradeNum == 3
-        Perc3_En
-    else if tradeNum == 4
-        Perc4_En
-    else if tradeNum == 5
-        Perc5_En
-    else if tradeNum == 6
-        Perc6_En
-    else if tradeNum == 7
-        Perc7_En
-    else if tradeNum == 8
-        Perc8_En
-    else if tradeNum == 9
-        Perc9_En
-    else if tradeNum == 10
-        Perc10_En
-    else if tradeNum == 11
-        Perc11_En
-    else if tradeNum == 12
-        Perc12_En
-    else
-        false
-
-// Function to find next enabled trade level starting from current
-findNextEnabledTrade(startFrom) =>
-    int nextEnabled = na
-    for i = startFrom to 12
-        if isTradeEnabled(i)
-            nextEnabled := i
-            break
-    nextEnabled
-
-// Check if current trade level is enabled
-isCurrentTradeEnabled() =>
-    isTradeEnabled(int(quantity_per.get(0)))
-
-// Check if we should allow new entry (not blocked by 5-trade limit)
-canEnterNewTrade() =>
-    if waiting_for_tp
-        false  // Block new entries while waiting for TP
-    else if enabled_trade_count >= 5
-        false  // Block after 5 enabled trades
-    else
-        true
-
-calculate_pnl()=>
-    var float PNL = 0.0
-    if strategy.closedtrades > 0
-        last_profit = strategy.closedtrades.profit(strategy.closedtrades - 1)
-        last_initial_capital = strategy.closedtrades.entry_price(strategy.closedtrades - 1) * math.abs(strategy.closedtrades.size(strategy.closedtrades - 1))
-        if last_initial_capital > 0
-            PNL := (last_profit / last_initial_capital) * 100
-    PNL
-
-
 mannualPercantage(side,trans)=>
-    PNL = calculate_pnl()
-    if side == 1
-        labelColor = PNL == 0 ? color.rgb(255, 255, 0, 63):  PNL < 0 ? #ff00005e : #00ff2f5e
-        label.new(bar_index[0],high[0],text = str.tostring(PNL, '#.##') + '%', style = label.style_label_lower_left,textcolor = color.white,color =labelColor,force_overlay = true)
-    if PercTypeIn == 1
-        if startCountBool.get(0)
-            quantity_per.set(0,1)
-            if startPerAfterLoss_En and PNL<0 and math.abs(PNL) >= startPerAfterLoss
-                if PNL > 0
-                    // Reset to first enabled trade
-                    firstEnabled = findNextEnabledTrade(1)
-                    quantity_per.set(0, na(firstEnabled) ? 1 : firstEnabled)
-                else if PNL == 0
-                    quantity_per.set(0,quantity_per.get(0))
-                else
-                    if quantity_per.get(0)==12
-                        quantity_per.set(0,12)
-                    else
-                        nextTrade = findNextEnabledTrade(int(quantity_per.get(0)) + 1)
-                        quantity_per.set(0, na(nextTrade) ? 12 : nextTrade)
-                startCountBool.set(0,false)
-            if startPerAfterLoss_En == false
-                startCountBool.set(0,false)
-        else
-            if PNL > 0
-                // Reset to first enabled trade
-                firstEnabled = findNextEnabledTrade(1)
-                quantity_per.set(0, na(firstEnabled) ? 1 : firstEnabled)
-            else if PNL == 0
-                quantity_per.set(0,quantity_per.get(0))
-            else
-                if quantity_per.get(0)==12
-                    quantity_per.set(0,12)
-                else
-                    nextTrade = findNextEnabledTrade(int(quantity_per.get(0)) + 1)
-                    quantity_per.set(0, na(nextTrade) ? 12 : nextTrade)
-    else
-        if startCountBool.get(0)
-            quantity_per.set(0,initial_per)
-            startCountBool.set(0,false)
-            if startPerAfterLoss_En == false
-                startCountBool.set(0,false)
-        else
-            if PNL > 0
-                cal = math.round(quantity_per.get(0) - (PNL * multiplier),2)
-                quantity_per.set(0,math.abs(cal))
-            else if PNL == 0
-                quantity_per.set(0,quantity_per.get(0))
-            else
-                cal = math.round(quantity_per.get(0) + (math.abs(PNL) * multiplier),2)
-                quantity_per.set(0,math.abs(cal))
-    PNL
+    var float PNL = 0.0
+    if strategy.closedtrades > 0
+        last_profit = strategy.closedtrades.profit(strategy.closedtrades - 1)
+        last_initial_capital = strategy.closedtrades.entry_price(strategy.closedtrades - 1) * math.abs(strategy.closedtrades.size(strategy.closedtrades - 1))
+        if last_initial_capital > 0
+            PNL := (last_profit / last_initial_capital) * 100
+    if side == 1
+        labelColor = PNL == 0 ? color.rgb(255, 255, 0, 63):  PNL < 0 ? #ff00005e : #00ff2f5e
+        label.new(bar_index[0],high[0],text = str.tostring(PNL, '#.##') + '%', style = label.style_label_lower_left,textcolor = color.white,color =labelColor,force_overlay = true)
+    if PercTypeIn == 1
+        if startCountBool.get(0)
+            quantity_per.set(0,1)
+            if startPerAfterLoss_En and PNL<0 and math.abs(PNL) >= startPerAfterLoss
+                if PNL > 0
+                    quantity_per.set(0,1)
+                else if PNL == 0
+                    quantity_per.set(0,quantity_per.get(0))
+                else
+                    if quantity_per.get(0)==12
+                        quantity_per.set(0,12)
+                    else
+                        quantity_per.set(0,quantity_per.get(0)+1)
+                startCountBool.set(0,false)
+            if startPerAfterLoss_En == false
+                startCountBool.set(0,false)
+        else
+            if PNL > 0
+                quantity_per.set(0,1)
+            else if PNL == 0
+                quantity_per.set(0,quantity_per.get(0))
+            else
+                if quantity_per.get(0)==12
+                    quantity_per.set(0,12)
+                else
+                    quantity_per.set(0,quantity_per.get(0)+1)
+    else
+        if startCountBool.get(0)
+            quantity_per.set(0,initial_per)
+            startCountBool.set(0,false)
+            if startPerAfterLoss_En == false
+                startCountBool.set(0,false)
+        else
+            if PNL > 0
+                cal = math.round(quantity_per.get(0) - (PNL * multiplier),2)
+                quantity_per.set(0,math.abs(cal))
+            else if PNL == 0
+                quantity_per.set(0,quantity_per.get(0))
+            else
+                cal = math.round(quantity_per.get(0) + (math.abs(PNL) * multiplier),2)
+                quantity_per.set(0,math.abs(cal))
+    PNL
 
 whenTradeClosed()=>
-    buy_happens.set(0,false)
-    sell_happens.set(0,false)
+    buy_happens.set(0,false)
+    sell_happens.set(0,false)
 
 whenClosed()=>
-    if (strategy.closedtrades.exit_bar_index(strategy.closedtrades - 1) == bar_index) or (strategy.position_size == 0 and strategy.position_size[1]!=0)
-        closed_buy_entry = str.contains(strategy.closedtrades.entry_id(strategy.closedtrades - 1),"buy")
-        closed_sell_entry = str.contains(strategy.closedtrades.entry_id(strategy.closedtrades - 1),"sell")
-        closed_ac_buy_entry = strategy.closedtrades.entry_id(strategy.closedtrades - 1) =="buy"
-        closed_ac_sell_entry = strategy.closedtrades.entry_id(strategy.closedtrades - 1) =="sell"
-        var float PNL = 0.0
-        if strategy.closedtrades > 0
-            last_profit = strategy.closedtrades.profit(strategy.closedtrades - 1)
-            last_initial_capital = strategy.closedtrades.entry_price(strategy.closedtrades - 1) * math.abs(strategy.closedtrades.size(strategy.closedtrades - 1))
-            if last_initial_capital > 0
-                PNL := (last_profit / last_initial_capital) * 100
-        labelColor = PNL == 0 ? color.rgb(255, 255, 0, 63):  PNL < 0 ? #ff00005e : #00ff1e5e
-        label.new(bar_index[0],high[0],text = str.tostring(PNL, '#.##') + '%',style = label.style_label_lower_left,textcolor = color.white,color =labelColor,force_overlay = true)
-        if closed_ac_buy_entry or closed_ac_sell_entry
-            close_id.set(0,strategy.closedtrades)
-            if PNL > 0
-                // Reset to first enabled trade
-                firstEnabled = findNextEnabledTrade(1)
-                quantity_per.set(0, na(firstEnabled) ? 1 : firstEnabled)
+    if (strategy.closedtrades.exit_bar_index(strategy.closedtrades - 1) == bar_index) or (strategy.position_size == 0 and strategy.position_size[1]!=0)
+        closed_buy_entry = str.contains(strategy.closedtrades.entry_id(strategy.closedtrades - 1),"buy")
+        closed_sell_entry = str.contains(strategy.closedtrades.entry_id(strategy.closedtrades - 1),"sell")
+        closed_ac_buy_entry = strategy.closedtrades.entry_id(strategy.closedtrades - 1) =="buy"
+        closed_ac_sell_entry = strategy.closedtrades.entry_id(strategy.closedtrades - 1) =="sell"
+        var float PNL = 0.0
+        if strategy.closedtrades > 0
+            last_profit = strategy.closedtrades.profit(strategy.closedtrades - 1)
+            last_initial_capital = strategy.closedtrades.entry_price(strategy.closedtrades - 1) * math.abs(strategy.closedtrades.size(strategy.closedtrades - 1))
+            if last_initial_capital > 0
+                PNL := (last_profit / last_initial_capital) * 100
+        labelColor = PNL == 0 ? color.rgb(255, 255, 0, 63):  PNL < 0 ? #ff00005e : #00ff1e5e
+        label.new(bar_index[0],high[0],text = str.tostring(PNL, '#.##') + '%',style = label.style_label_lower_left,textcolor = color.white,color =labelColor,force_overlay = true)
+        if closed_ac_buy_entry or closed_ac_sell_entry
+            close_id.set(0,strategy.closedtrades)
+            if PNL > 0
+                quantity_per.set(0,1)
 
 countTradeFromDate = input.time(defval = timestamp("1 Oct 2024 00:00:00 UTC+5:30"), title ="Count first Trade qty from ?",group = grop_per)
-startCount =  time('','UTC+5:30') == countTradeFromDate
+startCount =  time('','UTC+5:30') == countTradeFromDate
 if startCount
-    // Find first enabled trade
-    firstEnabled = findNextEnabledTrade(1)
-    quantity_per.set(0, na(firstEnabled) ? 1 : firstEnabled)
-    enabled_trade_count := 0
-    waiting_for_tp := false
-    startCountBool.set(0,true)
-
-exit_candle = (strategy.closedtrades > 0 and strategy.closedtrades.exit_bar_index(strategy.closedtrades - 1) == bar_index) or (strategy.position_size[1] != 0 and strategy.position_size == 0)
-
+    quantity_per.set(0,1)
+    startCountBool.set(0,true)
 
 // --- ENTRY/EXIT CONTROL FLAGS ---
-var bool buy_occur  = false
+var bool buy_occur  = false
 var bool sell_occur = false
 var bool can_open_buy = true // NEW: For strict rule enforcement
 var bool can_open_sell = true // NEW: For strict rule enforcement
@@ -689,463 +444,252 @@ var bool allowed_per_up_cloud = false
 var bool allowed_per_dn_cloud = false 
 
 if up_sup and up_sup[1] == false 
-    prc  = high 
-    line_prc = prc * (1 - BuyLineBuffer)
-    buy_line:=line.new(time, line_prc, time + 5 + 60 * 60 * 24, line_prc, xloc=xloc.bar_time, style=line.style_dotted,force_overlay = true,width = 2)
-    allowed_per_up_cloud:=true 
-    allowed_per_dn_cloud:=false 
+    prc  = high 
+    line_prc = prc * (1 - BuyLineBuffer)
+    buy_line:=line.new(time, line_prc, time + 5 + 60 * 60 * 24, line_prc, xloc=xloc.bar_time, style=line.style_dotted,force_overlay = true,width = 2)
+    allowed_per_up_cloud:=true 
+    allowed_per_dn_cloud:=false 
 
 if up_sup
-    buy_line.set_x2(time)
+    buy_line.set_x2(time)
 
 if dn_sup and dn_sup[1] == false 
-    prc  = low 
-    line_prc = prc * (1 + SellLineBuffer)
-    sell_line:=line.new(time, line_prc, time + 5 + 60 * 60 * 24, line_prc, xloc=xloc.bar_time, style=line.style_dotted,force_overlay = true,width = 2)
-    allowed_per_up_cloud:=false  
-    allowed_per_dn_cloud:=true  
+    prc  = low 
+    line_prc = prc * (1 + SellLineBuffer)
+    sell_line:=line.new(time, line_prc, time + 5 + 60 * 60 * 24, line_prc, xloc=xloc.bar_time, style=line.style_dotted,force_overlay = true,width = 2)
+    allowed_per_up_cloud:=false  
+    allowed_per_dn_cloud:=true  
 
 if dn_sup
-    sell_line.set_x2(time)
+    sell_line.set_x2(time)
+
+buy_line_entry  = (rsi_apply ? dn_rsi_touch : true ) and low < buy_line.get_y1()   and trendDirection == -1    and up_sup and up_sup[1]    and (alowwed_entry_on_cloud ? allowed_per_up_cloud : true )
+sell_line_entry = (rsi_apply ? up_rsi_touch : true ) and high > sell_line.get_y1() and trendDirection == 1     and dn_sup and dn_sup[1]    and (alowwed_entry_on_cloud ? allowed_per_dn_cloud : true )
 
 
+final_buy = lineBasedEntry ? (apply_ema ? buy_line_entry and ema1 > ema2 : buy_line_entry) : buy_entry
+final_sell = lineBasedEntry ? (apply_ema ? sell_line_entry and ema1 < ema2 : sell_line_entry)  : sell_entry
 
+if final_buy and (block_entry ? can_open_buy : true) and buy_occur==false and strategy.position_size == 0
+    if lineBasedEntry
+        allowed_per_up_cloud := false 
 
-// z src
-
-z = (close - ta.sma(close, len)) / ta.stdev(close, len) 
-color red = color.rgb(255, 0, 0, 69) 
-color green = color.rgb(0, 255, 8, 63) 
-color orange = color.orange 
-color z_color_plot = z > 0 ? green : z <= 0 ? red : orange 
-plot(entry_on_type2 ? z : na  , "Z-Score", color=z_color_plot, style=plot.style_area) 
-plot(entry_on_type2 ? upperlevel : na ,title = 'zscore-upline',color = color.rgb(255, 4, 4),linewidth = 2)
-plot(entry_on_type2 ? lowerlevel : na ,title = 'zscore-dnline',color = #00ff08,linewidth = 2)
-
-
-
-var z_score_buy  = false 
-var z_score_sell = false
-
-var int buy_z_count = 0
-var int sell_z_count = 0
-
-
-
-trenddir_buy_side       = apply_trendDirection ? trendDirection == -1 : true 
-trenddir_sell_side      = apply_trendDirection ? trendDirection == 1 : true 
-
-rsi_buy_side    = rsi_apply ? dn_rsi_touch : true
-rsi_sell_side   = rsi_apply ? up_rsi_touch : true 
-
-line_buy_side   = lineBasedEntry ? low < buy_line.get_y1()   and up_sup and up_sup[1]  : true 
-line_sell_side  = lineBasedEntry ? high > sell_line.get_y1() and dn_sup and dn_sup[1]  : true 
-
-
-scalper_buy_side   = apply_scalper_pro ? bull11  : true 
-scalper_sell_side  = apply_scalper_pro ? bear11  : true 
-
-
-if entry_on_type2
-    if z <= lowerlevel and line_buy_side
-        buy_z_count:=0
-        z_score_buy:=true 
-        z_score_sell:=false 
-        label.new(bar_index,z,style = label.style_none,textcolor = color.green,size = size.tiny,text = '●')
-    
-    if z >= upperlevel and line_sell_side
-        sell_z_count:=0
-        z_score_buy:=false  
-        z_score_sell:=true  
-        label.new(bar_index,z,style = label.style_none,textcolor = color.red,size = size.tiny,text = '●')
-
-    if z_score_buy
-        buy_z_count:=buy_z_count+1
-        if buy_z_count == candle_gap_from_zscore
-            z_score_buy:=false 
-            label.new(bar_index,high,text = str.tostring(buy_z_count,'MaxCandle: #.##'),force_overlay = true,size = size.tiny,textcolor = color.rgb(29, 27, 27),color=#0257054c)
-
-            buy_z_count:=0
-
-    if z_score_sell
-        sell_z_count:=sell_z_count+1
-        if sell_z_count == candle_gap_from_zscore
-            z_score_sell:=false 
-            label.new(bar_index,high,text = str.tostring(sell_z_count,'MaxCandle: #.##'),force_overlay = true,size = size.tiny,textcolor = #121111,color=color.rgb(237, 80, 80, 85))
-
-            sell_z_count:=0
-
-
-var bool buyLineTouched = false 
-var bool sellLineTouched = false 
-
-if apply_rsiStoch
-    if low < buy_line.get_y1()   and up_sup and up_sup[1]
-        buyLineTouched:=true 
-
-    if high > sell_line.get_y1() and dn_sup and dn_sup[1]
-        sellLineTouched:=true
-
-    if up_sup and up_sup[1]==false 
-        sellLineTouched:=false 
-    if dn_sup and dn_sup[1]==false 
-        buyLineTouched:=false 
-    
-    if exit_candle and calculate_pnl() <  0 and strategy.closedtrades.entry_id(strategy.closedtrades - 1) == 'buy'
-        allowed_per_up_cloud:=true 
-    if exit_candle and calculate_pnl() <  0 and strategy.closedtrades.entry_id(strategy.closedtrades - 1) == 'sell'
-        allowed_per_dn_cloud:=true 
-    if exit_candle and calculate_pnl() >  0 and strategy.closedtrades.entry_id(strategy.closedtrades - 1) == 'buy'
-        allowed_per_up_cloud:=false
-    if exit_candle and calculate_pnl() >  0 and strategy.closedtrades.entry_id(strategy.closedtrades - 1) == 'sell'
-        allowed_per_dn_cloud:=false 
-else
-    buyLineTouched:=true 
-    sellLineTouched:=true 
-    
-if apply_scalper_pro 
-    if exit_candle and calculate_pnl() <  0 and strategy.closedtrades.entry_id(strategy.closedtrades - 1) == 'buy'
-        allowed_per_up_cloud:=true 
-    if exit_candle and calculate_pnl() <  0 and strategy.closedtrades.entry_id(strategy.closedtrades - 1) == 'sell'
-        allowed_per_dn_cloud:=true 
-    if exit_candle and calculate_pnl() >  0 and strategy.closedtrades.entry_id(strategy.closedtrades - 1) == 'buy'
-        allowed_per_up_cloud:=false
-    if exit_candle and calculate_pnl() >  0 and strategy.closedtrades.entry_id(strategy.closedtrades - 1) == 'sell'
-        allowed_per_dn_cloud:=false 
-
-
-supertrend_onebuy_side  = alowwed_entry_on_cloud ? allowed_per_up_cloud : true 
-supertrend_onesell_side = alowwed_entry_on_cloud ? allowed_per_dn_cloud : true 
-
-
-
-
-
-
-
-tmo_buy_side    = apply_tmo ? up_sup and up_tmo  and strategy.position_size == 0 : true 
-tmo_sell_side   = apply_tmo ? dn_sup and dn_tmo  and strategy.position_size == 0 : true 
-
-ema_buy_side = apply_ema ? ema1 > ema2  : true 
-ema_sell_side = apply_ema ? ema1 < ema2  : true 
-
-buy_sha = entry_on_sha ? green_sha : true 
-buy_zscore = entry_on_type2  ? z_score_buy : true 
-buy_hacolt = entry_on_hacolt? green_hacolt : true 
-buy_super = entry_on_type2 ? up_sup : true 
-
-sell_sha = entry_on_sha? red_sha : true 
-sell_zscore = entry_on_type2 ? z_score_sell : true 
-sell_hacolt = entry_on_hacolt ? red_hacolt : true 
-sell_super = entry_on_type2 ? dn_sup : true 
-
-
-
-
-final_buy     = buy_sha   
-         and buy_zscore 
-         and buy_hacolt 
-         and buy_super
-         and trenddir_buy_side
-         and rsi_buy_side
-         and supertrend_onebuy_side
-         and tmo_buy_side
-         and ema_buy_side
-         and (entry_on_type2 ? true : line_buy_side and up_sup)
-         and (apply_rsiStoch ? line_buy_side and buySignalRsiStoch : true)
-         and scalper_buy_side
-
-
-final_sell = sell_sha
-         and sell_zscore 
-         and sell_hacolt 
-         and sell_super
-         and trenddir_sell_side
-         and rsi_sell_side
-         and supertrend_onesell_side
-         and tmo_sell_side
-         and ema_sell_side
-         and (entry_on_type2 ? true : line_sell_side and dn_sup)
-         and (apply_rsiStoch ? line_sell_side and sellSignalRsiStoch : true )
-         and scalper_sell_side
-
-
-
-
-if final_buy and (block_entry ? can_open_buy : true) and buy_occur==false and strategy.position_size == 0 and canEnterNewTrade() and isCurrentTradeEnabled()
-
-    // label.new(bar_index,high,color = color.green,force_overlay = true)
-
-    if lineBasedEntry
-        allowed_per_up_cloud := false 
-
-    buy_occur:=true
-    sell_occur:=false
-    can_open_buy := false             // block buy until next new sell
-    can_open_sell := true             // allow sell if opposite signal
-    label.new(bar_index,low,force_overlay = true,style = label.style_label_up,color = color.rgb(0, 247, 8, 44),size = size.small)
-    buy_happens.set(0,true)
-    sell_happens.set(0,false)
-    strategy.cancel_all()
-    if strategy.position_size<0
+    buy_occur:=true
+    sell_occur:=false
+    can_open_buy := false             // block buy until next new sell
+    can_open_sell := true             // allow sell if opposite signal
+    label.new(bar_index,low,force_overlay = true,style = label.style_label_up,color = color.rgb(0, 247, 8, 44),size = size.small)
+    buy_happens.set(0,true)
+    sell_happens.set(0,false)
+    strategy.cancel_all()
+    if strategy.position_size<0
         strategy.close('sell',alert_message = syntaxFun(true),comment = 'Ex : '+str.tostring(quantity_per.get(0)))
-        mannualPercantage(1,'buy')
-    else
-        mannualPercantage(0,'buy')
-    
-    // Increment enabled trade count
-    enabled_trade_count := enabled_trade_count + 1
-    
-    // If this is the 5th enabled trade, set waiting flag
-    if enabled_trade_count >= 5
-        waiting_for_tp := true
-    
-    string usdt_amount_str = getUsdtAmount()
-    float usdt_amount = str.tonumber(usdt_amount_str)
-    float quantity_to_trade = usdt_amount > 0 ? usdt_amount / close : 0
+        mannualPercantage(1,'buy')
+    else
+        mannualPercantage(0,'buy')
+    string usdt_amount_str = getUsdtAmount()
+    float usdt_amount = str.tonumber(usdt_amount_str)
+    float quantity_to_trade = usdt_amount > 0 ? usdt_amount / close : 0
+    if quantity_to_trade > 0
+        strategy.entry('buy',strategy.long, qty=quantity_to_trade, alert_message = syntaxFun(false),comment = 'buy : '+usdt_amount_str)
+    entryPrice := close
+    buystoploss_val := entryPrice * (1 - stoploss_val * 0.01)
+    TP0_V:=buyTp(target0)
+    TP1_V:=buyTp(target1)
+    TP2_V:=buyTp(target2)
+    TP3_V:=buyTp(target3)
+    TP4_V:=buyTp(target4)
+    TP5_V:=buyTp(target5)
+    TP6_V:=buyTp(target6)
+    TP7_V:=buyTp(target7)
+    TP8_V:=buyTp(target8)
+    TP9_V:=buyTp(target9)
+    TP10_V:=buyTp(target10)
+    TP11_V:=buyTp(target11)
+    TP12_V:=buyTp(target12)
 
+if final_sell and (block_entry ? can_open_sell : true) and sell_occur==false  and strategy.position_size == 0
+    if lineBasedEntry
+        allowed_per_dn_cloud := false 
 
-
-    if entry_on_type2
-        strategy.entry('buy',strategy.long, qty=quantity_to_trade, alert_message = '[{"MODE":"ONEWAY","EXIT":"EXIT","TS":"'+symbol+'","B":"BINANCEFUTURE"},{"MODE":"ONEWAY","TS":"'+symbol+'","TT":"BUY","OT":"MARKET","FUND":"'+usdt_amount_str+'","LVG":"'+margin+'","B":"BINANCEFUTURE"}]',comment = 'buy : '+usdt_amount_str)
-    else
-        // if quantity_to_trade > 0 
-        strategy.entry('buy',strategy.long, qty=quantity_to_trade, alert_message = '[{"MODE":"ONEWAY","EXIT":"EXIT","TS":"'+symbol+'","B":"BINANCEFUTURE"},{"MODE":"ONEWAY","TS":"'+symbol+'","TT":"BUY","OT":"MARKET","FUND":"'+usdt_amount_str+'","LVG":"'+margin+'","B":"BINANCEFUTURE"}]',comment = 'buy : '+usdt_amount_str)
-
-
-    entryPrice := close
-    buystoploss_val := entryPrice * (1 - stoploss_val * 0.01)
-    TP0_V:=buyTp(target0)
-    TP1_V:=buyTp(target1)
-    TP2_V:=buyTp(target2)
-    TP3_V:=buyTp(target3)
-    TP4_V:=buyTp(target4)
-    TP5_V:=buyTp(target5)
-    TP6_V:=buyTp(target6)
-    TP7_V:=buyTp(target7)
-    TP8_V:=buyTp(target8)
-    TP9_V:=buyTp(target9)
-    TP10_V:=buyTp(target10)
-    TP11_V:=buyTp(target11)
-    TP12_V:=buyTp(target12)
-
-
-
-
-if final_sell and (block_entry ? can_open_sell : true) and sell_occur==false  and strategy.position_size == 0 and canEnterNewTrade() and isCurrentTradeEnabled()
- 
-
-
-    if lineBasedEntry
-        allowed_per_dn_cloud := false 
-
-    buy_occur:=false
-    sell_occur:=true
-    can_open_sell := false            // block sell until next new buy
-    can_open_buy := true              // allow buy if opposite signal
-    label.new(bar_index,high,force_overlay = true,style = label.style_label_down,color = color.rgb(255, 0, 0, 40),size = size.small)
-    buy_happens.set(0,false)
-    sell_happens.set(0,true)
-    NewTradesCount:=0
-    strategy.cancel_all()
-    if strategy.position_size>0
+    buy_occur:=false
+    sell_occur:=true
+    can_open_sell := false            // block sell until next new buy
+    can_open_buy := true              // allow buy if opposite signal
+    label.new(bar_index,high,force_overlay = true,style = label.style_label_down,color = color.rgb(255, 0, 0, 40),size = size.small)
+    buy_happens.set(0,false)
+    sell_happens.set(0,true)
+    NewTradesCount:=0
+    strategy.cancel_all()
+    if strategy.position_size>0
         strategy.close('buy',alert_message = syntaxFun(true),comment = 'Ex : '+str.tostring(quantity_per.get(0)))
-        mannualPercantage(1,'sell')
-    else
-        mannualPercantage(0,'sell')
-    
-    // Increment enabled trade count
-    enabled_trade_count := enabled_trade_count + 1
-    
-    // If this is the 5th enabled trade, set waiting flag
-    if enabled_trade_count >= 5
-        waiting_for_tp := true
-    
-    string usdt_amount_str = getUsdtAmount()
-    float usdt_amount = str.tonumber(usdt_amount_str)
-    float quantity_to_trade = usdt_amount > 0 ? usdt_amount / close : 0
-
-    if entry_on_type2
-        strategy.entry('sell',strategy.short, qty=quantity_to_trade, alert_message = '[{"MODE":"ONEWAY","EXIT":"EXIT","TS":"'+symbol+'","B":"BINANCEFUTURE"},{"MODE":"ONEWAY","TS":"'+symbol+'","TT":"SELL","OT":"MARKET","FUND":"'+usdt_amount_str+'","LVG":"'+margin+'","B":"BINANCEFUTURE"}]',comment = 'sell : '+usdt_amount_str)
-    else
-        // if quantity_to_trade > 0
-        strategy.entry('sell',strategy.short, qty=quantity_to_trade, alert_message = '[{"MODE":"ONEWAY","EXIT":"EXIT","TS":"'+symbol+'","B":"BINANCEFUTURE"},{"MODE":"ONEWAY","TS":"'+symbol+'","TT":"SELL","OT":"MARKET","FUND":"'+usdt_amount_str+'","LVG":"'+margin+'","B":"BINANCEFUTURE"}]',comment = 'sell : '+usdt_amount_str)
-    entryPrice := close
-    sellstoploss_val := entryPrice * (1 + stoploss_val * 0.01)
-    TP0_V:=sellTp(target0)
-    TP1_V:=sellTp(target1)
-    TP2_V:=sellTp(target2)
-    TP3_V:=sellTp(target3)
-    TP4_V:=sellTp(target4)
-    TP5_V:=sellTp(target5)
-    TP6_V:=sellTp(target6)
-    TP7_V:=sellTp(target7)
-    TP8_V:=sellTp(target8)
-    TP9_V:=sellTp(target9)
-    TP10_V:=sellTp(target10)
-    TP11_V:=sellTp(target11)
-    TP12_V:=sellTp(target12)
+        mannualPercantage(1,'sell')
+    else
+        mannualPercantage(0,'sell')
+    string usdt_amount_str = getUsdtAmount()
+    float usdt_amount = str.tonumber(usdt_amount_str)
+    float quantity_to_trade = usdt_amount > 0 ? usdt_amount / close : 0
+    if quantity_to_trade > 0
+        strategy.entry('sell',strategy.short, qty=quantity_to_trade, alert_message = syntaxFun(false),comment = 'sell : '+usdt_amount_str)
+    entryPrice := close
+    sellstoploss_val := entryPrice * (1 + stoploss_val * 0.01)
+    TP0_V:=sellTp(target0)
+    TP1_V:=sellTp(target1)
+    TP2_V:=sellTp(target2)
+    TP3_V:=sellTp(target3)
+    TP4_V:=sellTp(target4)
+    TP5_V:=sellTp(target5)
+    TP6_V:=sellTp(target6)
+    TP7_V:=sellTp(target7)
+    TP8_V:=sellTp(target8)
+    TP9_V:=sellTp(target9)
+    TP10_V:=sellTp(target10)
+    TP11_V:=sellTp(target11)
+    TP12_V:=sellTp(target12)
 
 BUY_occur = ta.barssince(final_buy)
 SELL_occur = ta.barssince(final_sell)
-crossover_TP0   = ta.barssince(ta.crossover(high,TP0_V))
-crossover_TP1   = ta.barssince(ta.crossover(close,TP1_V))
-crossunder_TP0  = ta.barssince(ta.crossunder(low,TP0_V))
-crossunder_TP1  = ta.barssince(ta.crossunder(close,TP1_V))
-crossover_TP2   = ta.barssince(ta.crossover(close,TP2_V))
-crossunder_TP2  = ta.barssince(ta.crossunder(close,TP2_V))
-crossover_TP3   = ta.barssince(ta.crossover(close,TP3_V))
-crossunder_TP3  = ta.barssince(ta.crossunder(close,TP3_V))
-crossover_TP4   = ta.barssince(ta.crossover(close,TP4_V))
-crossunder_TP4  = ta.barssince(ta.crossunder(close,TP4_V))
-crossover_TP5   = ta.barssince(ta.crossover(close,TP5_V))
-crossunder_TP5  = ta.barssince(ta.crossunder(close,TP5_V))
-crossover_TP6   = ta.barssince(ta.crossover(close,TP6_V))
-crossunder_TP6  = ta.barssince(ta.crossunder(close,TP6_V))
-crossover_TP7   = ta.barssince(ta.crossover(close,TP7_V))
-crossunder_TP7  = ta.barssince(ta.crossunder(close,TP7_V))
-crossover_TP8   = ta.barssince(ta.crossover(close,TP8_V))
-crossunder_TP8  = ta.barssince(ta.crossunder(close,TP8_V))
-crossover_TP9   = ta.barssince(ta.crossover(close,TP9_V))
-crossunder_TP9  = ta.barssince(ta.crossunder(close,TP9_V))
-crossover_TP10  = ta.barssince(ta.crossover(close,TP10_V))
+crossover_TP0   = ta.barssince(ta.crossover(high,TP0_V))
+crossover_TP1   = ta.barssince(ta.crossover(close,TP1_V))
+crossunder_TP0  = ta.barssince(ta.crossunder(low,TP0_V))
+crossunder_TP1  = ta.barssince(ta.crossunder(close,TP1_V))
+crossover_TP2   = ta.barssince(ta.crossover(close,TP2_V))
+crossunder_TP2  = ta.barssince(ta.crossunder(close,TP2_V))
+crossover_TP3   = ta.barssince(ta.crossover(close,TP3_V))
+crossunder_TP3  = ta.barssince(ta.crossunder(close,TP3_V))
+crossover_TP4   = ta.barssince(ta.crossover(close,TP4_V))
+crossunder_TP4  = ta.barssince(ta.crossunder(close,TP4_V))
+crossover_TP5   = ta.barssince(ta.crossover(close,TP5_V))
+crossunder_TP5  = ta.barssince(ta.crossunder(close,TP5_V))
+crossover_TP6   = ta.barssince(ta.crossover(close,TP6_V))
+crossunder_TP6  = ta.barssince(ta.crossunder(close,TP6_V))
+crossover_TP7   = ta.barssince(ta.crossover(close,TP7_V))
+crossunder_TP7  = ta.barssince(ta.crossunder(close,TP7_V))
+crossover_TP8   = ta.barssince(ta.crossover(close,TP8_V))
+crossunder_TP8  = ta.barssince(ta.crossunder(close,TP8_V))
+crossover_TP9   = ta.barssince(ta.crossover(close,TP9_V))
+crossunder_TP9  = ta.barssince(ta.crossunder(close,TP9_V))
+crossover_TP10  = ta.barssince(ta.crossover(close,TP10_V))
 crossunder_TP10 = ta.barssince(ta.crossunder(close,TP10_V))
-crossover_TP11  = ta.barssince(ta.crossover(close,TP11_V))
+crossover_TP11  = ta.barssince(ta.crossover(close,TP11_V))
 crossunder_TP11 = ta.barssince(ta.crossunder(close,TP11_V))
-crossover_TP12  = ta.barssince(ta.crossover(close,TP12_V))
+crossover_TP12  = ta.barssince(ta.crossover(close,TP12_V))
 crossunder_TP12 = ta.barssince(ta.crossunder(close,TP12_V))
 
-BUY_TP0         = target_bool_0 and crossover_TP0>crossunder_TP0  and crossunder_TP0==0 and BUY_occur>crossover_TP0
-BUY_TP1         = target_bool_1 and  crossover_TP1>crossunder_TP1  and crossunder_TP1==0 and BUY_occur>crossover_TP1 and buyTargetArr.get(0) == false
-BUY_TP2         = target_bool_2 and crossover_TP2>crossunder_TP2  and crossunder_TP2==0 and BUY_occur>crossover_TP2  and buyTargetArr.get(1) == false
-BUY_TP3         = target_bool_3 and crossover_TP3>crossunder_TP3  and crossunder_TP3==0 and BUY_occur>crossover_TP3   and buyTargetArr.get(2) == false
-BUY_TP4         = target_bool_4 and crossover_TP4>crossunder_TP4  and crossunder_TP4==0 and BUY_occur>crossover_TP4   and buyTargetArr.get(3) == false
-BUY_TP5         = target_bool_5 and crossover_TP5>crossunder_TP5  and crossunder_TP5==0 and BUY_occur>crossover_TP5   and buyTargetArr.get(4) == false
-BUY_TP6         = target_bool_6 and crossover_TP6>crossunder_TP6  and crossunder_TP6==0 and BUY_occur>crossover_TP6   and buyTargetArr.get(5) == false
-BUY_TP7         = target_bool_7 and crossover_TP7>crossunder_TP7  and crossunder_TP7==0 and BUY_occur>crossover_TP7   and buyTargetArr.get(6) == false
-BUY_TP8         = target_bool_8 and crossover_TP8>crossunder_TP8  and crossunder_TP8==0 and BUY_occur>crossover_TP8   and buyTargetArr.get(7) == false
-BUY_TP9         = target_bool_9 and crossover_TP9>crossunder_TP9  and crossunder_TP9==0 and BUY_occur>crossover_TP9   and buyTargetArr.get(8) == false
-BUY_TP10        = target_bool_10 and crossover_TP10>crossunder_TP10  and crossunder_TP10==0 and BUY_occur>crossover_TP10   and buyTargetArr.get(9) == false
-BUY_TP11        = target_bool_11 and crossover_TP11>crossunder_TP11  and crossunder_TP11==0 and BUY_occur>crossover_TP11   and buyTargetArr.get(10) == false
-BUY_TP12        = target_bool_12 and crossover_TP12>crossunder_TP12  and crossunder_TP12==0 and BUY_occur>crossover_TP12   and buyTargetArr.get(11) == false
+BUY_TP0         = target_bool_0 and crossover_TP0>crossunder_TP0  and crossunder_TP0==0 and BUY_occur>crossover_TP0
+BUY_TP1         = target_bool_1 and  crossover_TP1>crossunder_TP1  and crossunder_TP1==0 and BUY_occur>crossover_TP1 and buyTargetArr.get(0) == false
+BUY_TP2         = target_bool_2 and crossover_TP2>crossunder_TP2  and crossunder_TP2==0 and BUY_occur>crossover_TP2  and buyTargetArr.get(1) == false
+BUY_TP3         = target_bool_3 and crossover_TP3>crossunder_TP3  and crossunder_TP3==0 and BUY_occur>crossover_TP3   and buyTargetArr.get(2) == false
+BUY_TP4         = target_bool_4 and crossover_TP4>crossunder_TP4  and crossunder_TP4==0 and BUY_occur>crossover_TP4   and buyTargetArr.get(3) == false
+BUY_TP5         = target_bool_5 and crossover_TP5>crossunder_TP5  and crossunder_TP5==0 and BUY_occur>crossover_TP5   and buyTargetArr.get(4) == false
+BUY_TP6         = target_bool_6 and crossover_TP6>crossunder_TP6  and crossunder_TP6==0 and BUY_occur>crossover_TP6   and buyTargetArr.get(5) == false
+BUY_TP7         = target_bool_7 and crossover_TP7>crossunder_TP7  and crossunder_TP7==0 and BUY_occur>crossover_TP7   and buyTargetArr.get(6) == false
+BUY_TP8         = target_bool_8 and crossover_TP8>crossunder_TP8  and crossunder_TP8==0 and BUY_occur>crossover_TP8   and buyTargetArr.get(7) == false
+BUY_TP9         = target_bool_9 and crossover_TP9>crossunder_TP9  and crossunder_TP9==0 and BUY_occur>crossover_TP9   and buyTargetArr.get(8) == false
+BUY_TP10        = target_bool_10 and crossover_TP10>crossunder_TP10  and crossunder_TP10==0 and BUY_occur>crossover_TP10   and buyTargetArr.get(9) == false
+BUY_TP11        = target_bool_11 and crossover_TP11>crossunder_TP11  and crossunder_TP11==0 and BUY_occur>crossover_TP11   and buyTargetArr.get(10) == false
+BUY_TP12        = target_bool_12 and crossover_TP12>crossunder_TP12  and crossunder_TP12==0 and BUY_occur>crossover_TP12   and buyTargetArr.get(11) == false
 
-SELL_TP0        = target_bool_0 and crossover_TP0<crossunder_TP0  and crossover_TP0==0 and SELL_occur>crossunder_TP0
-SELL_TP1        = target_bool_1 and crossover_TP1<crossunder_TP1  and crossover_TP1==0 and SELL_occur>crossunder_TP1     and sellTargetArr.get(0) == false
-SELL_TP2        = target_bool_2 and crossover_TP2<crossunder_TP2  and crossover_TP2==0 and SELL_occur>crossunder_TP2     and sellTargetArr.get(1) == false
-SELL_TP3        = target_bool_3 and crossover_TP3<crossunder_TP3  and crossover_TP3==0 and SELL_occur>crossunder_TP3     and sellTargetArr.get(2) == false
-SELL_TP4        = target_bool_4 and crossover_TP4<crossunder_TP4  and crossover_TP4==0 and SELL_occur>crossunder_TP4     and sellTargetArr.get(3) == false
-SELL_TP5        = target_bool_5 and crossover_TP5<crossunder_TP5  and crossover_TP5==0 and SELL_occur>crossunder_TP5     and sellTargetArr.get(4) == false
-SELL_TP6        = target_bool_6 and crossover_TP6<crossunder_TP6  and crossover_TP6==0 and SELL_occur>crossunder_TP6     and sellTargetArr.get(5) == false
-SELL_TP7        = target_bool_7 and crossover_TP7<crossunder_TP7  and crossover_TP7==0 and SELL_occur>crossunder_TP7     and sellTargetArr.get(6) == false
-SELL_TP8        = target_bool_8 and crossover_TP8<crossunder_TP8  and crossover_TP8==0 and SELL_occur>crossunder_TP8     and sellTargetArr.get(7) == false
-SELL_TP9        = target_bool_9 and crossover_TP9<crossunder_TP9  and crossover_TP9==0 and SELL_occur>crossunder_TP9     and sellTargetArr.get(8) == false
-SELL_TP10       = target_bool_10 and crossover_TP10<crossunder_TP10  and crossover_TP10==0 and SELL_occur>crossunder_TP10     and sellTargetArr.get(9) == false
-SELL_TP11       = target_bool_11 and crossover_TP11<crossunder_TP11  and crossover_TP11==0 and SELL_occur>crossunder_TP11     and sellTargetArr.get(10) == false
-SELL_TP12       = target_bool_12 and crossover_TP12<crossunder_TP12  and crossover_TP12==0 and SELL_occur>crossunder_TP12     and sellTargetArr.get(11) == false
+SELL_TP0        = target_bool_0 and crossover_TP0<crossunder_TP0  and crossover_TP0==0 and SELL_occur>crossunder_TP0
+SELL_TP1        = target_bool_1 and crossover_TP1<crossunder_TP1  and crossover_TP1==0 and SELL_occur>crossunder_TP1     and sellTargetArr.get(0) == false
+SELL_TP2        = target_bool_2 and crossover_TP2<crossunder_TP2  and crossover_TP2==0 and SELL_occur>crossunder_TP2     and sellTargetArr.get(1) == false
+SELL_TP3        = target_bool_3 and crossover_TP3<crossunder_TP3  and crossover_TP3==0 and SELL_occur>crossunder_TP3     and sellTargetArr.get(2) == false
+SELL_TP4        = target_bool_4 and crossover_TP4<crossunder_TP4  and crossover_TP4==0 and SELL_occur>crossunder_TP4     and sellTargetArr.get(3) == false
+SELL_TP5        = target_bool_5 and crossover_TP5<crossunder_TP5  and crossover_TP5==0 and SELL_occur>crossunder_TP5     and sellTargetArr.get(4) == false
+SELL_TP6        = target_bool_6 and crossover_TP6<crossunder_TP6  and crossover_TP6==0 and SELL_occur>crossunder_TP6     and sellTargetArr.get(5) == false
+SELL_TP7        = target_bool_7 and crossover_TP7<crossunder_TP7  and crossover_TP7==0 and SELL_occur>crossunder_TP7     and sellTargetArr.get(6) == false
+SELL_TP8        = target_bool_8 and crossover_TP8<crossunder_TP8  and crossover_TP8==0 and SELL_occur>crossunder_TP8     and sellTargetArr.get(7) == false
+SELL_TP9        = target_bool_9 and crossover_TP9<crossunder_TP9  and crossover_TP9==0 and SELL_occur>crossunder_TP9     and sellTargetArr.get(8) == false
+SELL_TP10       = target_bool_10 and crossover_TP10<crossunder_TP10  and crossover_TP10==0 and SELL_occur>crossunder_TP10     and sellTargetArr.get(9) == false
+SELL_TP11       = target_bool_11 and crossover_TP11<crossunder_TP11  and crossover_TP11==0 and SELL_occur>crossunder_TP11     and sellTargetArr.get(10) == false
+SELL_TP12       = target_bool_12 and crossover_TP12<crossunder_TP12  and crossover_TP12==0 and SELL_occur>crossunder_TP12     and sellTargetArr.get(11) == false
 
 targetExit(targetType,lot,entrySide,tpNo)=>
-    if targetType
-        // Calculate the quantity to close based on a percentage of the open position.
-        // This ensures that if lot is 100, we close 100% of the position.
-        float qty_to_exit = strategy.position_size * lot / 100
-        
-        if str.contains(strategy.opentrades.entry_comment(strategy.opentrades - 1),'k')
-            strategy.close('k-'+entrySide,comment = 'k-TP'+tpNo+' : '+str.tostring(quantity_per.get(0)),qty = qty_to_exit)
-        else
+    if targetType
+        // Calculate the quantity to close based on a percentage of the open position.
+        // This ensures that if lot is 100, we close 100% of the position.
+        float qty_to_exit = strategy.position_size * lot / 100
+        
+        if str.contains(strategy.opentrades.entry_comment(strategy.opentrades - 1),'k')
+            strategy.close('k-'+entrySide,comment = 'k-TP'+tpNo+' : '+str.tostring(quantity_per.get(0)),qty = qty_to_exit)
+        else
             strategy.close(entrySide,alert_message =  syntaxFun(true),comment = 'TP'+tpNo+' : '+str.tostring(quantity_per.get(0)),qty = qty_to_exit)
-        whenTradeClosed()
-        index = int(str.tonumber(tpNo))
-        if entrySide == 'buy'
-            buyTargetArr.set(index - 1 , true)
-            for i=0 to 11
-                sellTargetArr.set(i , false)
-        else if entrySide == 'sell'
-            sellTargetArr.set(index - 1 , true)
-            for i=0 to 11
-                buyTargetArr.set(i , false)
-        ''
-    ''
+        whenTradeClosed()
+        index = int(str.tonumber(tpNo))
+        if entrySide == 'buy'
+            buyTargetArr.set(index - 1 , true)
+            for i=0 to 11
+                sellTargetArr.set(i , false)
+        else if entrySide == 'sell'
+            sellTargetArr.set(index - 1 , true)
+            for i=0 to 11
+                buyTargetArr.set(i , false)
+        ''
+    ''
 
 if strategy.position_size > 0
-    if target_type_ex == 'Touch'
-        strategy.exit("buyEx", "buy", stop=buystoploss_val, limit=TP1_V, comment_loss='SL : ' + str.tostring(quantity_per.get(0)), comment_profit='TARGET :' + str.tostring(quantity_per.get(0)), alert_message='[{"MODE":"ONEWAY","EXIT":"EXIT","TS":"'+symbol+'","B":"BINANCEFUTURE"}]')
+    if target_type_ex == 'Touch'
+        strategy.exit("buyEx", "buy", stop=buystoploss_val, limit=TP1_V, comment_loss='SL : ' + str.tostring(quantity_per.get(0)), comment_profit='TARGET :' + str.tostring(quantity_per.get(0)), alert_message=syntaxFun(true))
     else // 'Close' mode
-        strategy.exit("buyEx", "buy", stop=buystoploss_val, comment_loss='SL : ' + str.tostring(quantity_per.get(0)), alert_message='[{"MODE":"ONEWAY","EXIT":"EXIT","TS":"'+symbol+'","B":"BINANCEFUTURE"}]')
+        strategy.exit("buyEx", "buy", stop=buystoploss_val, comment_loss='SL : ' + str.tostring(quantity_per.get(0)), alert_message=syntaxFun(true))
 
-    if barstate.isconfirmed and not final_sell
-        if target_type_ex == 'Close'
-            targetExit(BUY_TP1,target1_lot,'buy','1')
-        targetExit(BUY_TP2,target2_lot,'buy','2')
-        targetExit(BUY_TP3,target3_lot,'buy','3')
-        targetExit(BUY_TP4,target4_lot,'buy','4')
-        targetExit(BUY_TP5,target5_lot,'buy','5')
-        targetExit(BUY_TP6,target6_lot,'buy','6')
-        targetExit(BUY_TP7,target7_lot,'buy','7')
-        targetExit(BUY_TP8,target8_lot,'buy','8')
-        targetExit(BUY_TP9,target9_lot,'buy','9')
-        targetExit(BUY_TP10,target10_lot,'buy','10')
-        targetExit(BUY_TP11,target11_lot,'buy','11')
-        targetExit(BUY_TP12,target12_lot,'buy','12')
+    if barstate.isconfirmed and not final_sell
+        if target_type_ex == 'Close'
+            targetExit(BUY_TP1,target1_lot,'buy','1')
+        targetExit(BUY_TP2,target2_lot,'buy','2')
+        targetExit(BUY_TP3,target3_lot,'buy','3')
+        targetExit(BUY_TP4,target4_lot,'buy','4')
+        targetExit(BUY_TP5,target5_lot,'buy','5')
+        targetExit(BUY_TP6,target6_lot,'buy','6')
+        targetExit(BUY_TP7,target7_lot,'buy','7')
+        targetExit(BUY_TP8,target8_lot,'buy','8')
+        targetExit(BUY_TP9,target9_lot,'buy','9')
+        targetExit(BUY_TP10,target10_lot,'buy','10')
+        targetExit(BUY_TP11,target11_lot,'buy','11')
+        targetExit(BUY_TP12,target12_lot,'buy','12')
 
 if strategy.position_size < 0
-    if target_type_ex == 'Touch'
-        strategy.exit("sellEx", "sell", stop=sellstoploss_val, limit=TP1_V, comment_loss='SL : ' + str.tostring(quantity_per.get(0)), comment_profit='TARGET :' + str.tostring(quantity_per.get(0)), alert_message='[{"MODE":"ONEWAY","EXIT":"EXIT","TS":"'+symbol+'","B":"BINANCEFUTURE"}]')
+    if target_type_ex == 'Touch'
+        strategy.exit("sellEx", "sell", stop=sellstoploss_val, limit=TP1_V, comment_loss='SL : ' + str.tostring(quantity_per.get(0)), comment_profit='TARGET :' + str.tostring(quantity_per.get(0)), alert_message=syntaxFun(true))
     else // 'Close' mode
-        strategy.exit("sellEx", "sell", stop=sellstoploss_val, comment_loss='SL : ' + str.tostring(quantity_per.get(0)), alert_message='[{"MODE":"ONEWAY","EXIT":"EXIT","TS":"'+symbol+'","B":"BINANCEFUTURE"}]')
-        
-    if barstate.isconfirmed and not final_buy
-        if target_type_ex == 'Close'
-            targetExit(SELL_TP1,target1_lot,'sell','1')
-        targetExit(SELL_TP2,target2_lot,'sell','2')
-        targetExit(SELL_TP3,target3_lot,'sell','3')
-        targetExit(SELL_TP4,target4_lot,'sell','4')
-        targetExit(SELL_TP5,target5_lot,'sell','5')
-        targetExit(SELL_TP6,target6_lot,'sell','6')
-        targetExit(SELL_TP7,target7_lot,'sell','7')
-        targetExit(SELL_TP8,target8_lot,'sell','8')
-        targetExit(SELL_TP9,target9_lot,'sell','9')
-        targetExit(SELL_TP10,target10_lot,'sell','10')
-        targetExit(SELL_TP11,target11_lot,'sell','11')
-        targetExit(SELL_TP12,target12_lot,'sell','12')
+        strategy.exit("sellEx", "sell", stop=sellstoploss_val, comment_loss='SL : ' + str.tostring(quantity_per.get(0)), alert_message=syntaxFun(true))
+        
+    if barstate.isconfirmed and not final_buy
+        if target_type_ex == 'Close'
+            targetExit(SELL_TP1,target1_lot,'sell','1')
+        targetExit(SELL_TP2,target2_lot,'sell','2')
+        targetExit(SELL_TP3,target3_lot,'sell','3')
+        targetExit(SELL_TP4,target4_lot,'sell','4')
+        targetExit(SELL_TP5,target5_lot,'sell','5')
+        targetExit(SELL_TP6,target6_lot,'sell','6')
+        targetExit(SELL_TP7,target7_lot,'sell','7')
+        targetExit(SELL_TP8,target8_lot,'sell','8')
+        targetExit(SELL_TP9,target9_lot,'sell','9')
+        targetExit(SELL_TP10,target10_lot,'sell','10')
+        targetExit(SELL_TP11,target11_lot,'sell','11')
+        targetExit(SELL_TP12,target12_lot,'sell','12')
 
+exit_candle = (strategy.closedtrades > 0 and strategy.closedtrades.exit_bar_index(strategy.closedtrades - 1) == bar_index) or (strategy.position_size[1] != 0 and strategy.position_size == 0)
 if exit_candle
-    // Trade close hone par direction ke hisaab se flag disable karo
-    if strategy.closedtrades > 0
-        is_buy_trade_closed = str.contains(strategy.closedtrades.entry_id(strategy.closedtrades-1), "buy")
-        if is_buy_trade_closed
-            can_open_buy := false
-            can_open_sell := true
-        else
-            can_open_sell := false
-            can_open_buy := true
-        
-        // Check if TP was hit (profit > 0) and we were waiting for TP
-        last_profit = strategy.closedtrades.profit(strategy.closedtrades - 1)
-        if waiting_for_tp and last_profit > 0
-            // TP hit - reset to trade-1 and restart sequence
-            enabled_trade_count := 0
-            waiting_for_tp := false
-            // Find first enabled trade (might not be 1 if Perc1_En is false)
-            firstEnabled = findNextEnabledTrade(1)
-            quantity_per.set(0, na(firstEnabled) ? 1 : firstEnabled)
-            
+    // Trade close hone par direction ke hisaab se flag disable karo
+    if strategy.closedtrades > 0
+        is_buy_trade_closed = str.contains(strategy.closedtrades.entry_id(strategy.closedtrades-1), "buy")
+        if is_buy_trade_closed
+            can_open_buy := false
+            can_open_sell := true
+        else
+            can_open_sell := false
+            can_open_buy := true
+            
 
-    // label.new(bar_index,high,force_overlay = true)
-    buy_occur := false
-    sell_occur := false
-    dn_rsi_touch := false
-    up_rsi_touch := false
-
-    z_score_buy:=false 
-
-    z_score_sell:=false 
-
+    // label.new(bar_index,high,force_overlay = true)
+    buy_occur := false
+    sell_occur := false
+    dn_rsi_touch := false
+    up_rsi_touch := false
 
 showInStyle = false
 plotshape( startCount, style=shape.labelup, color=color.rgb(8, 118, 3, 64), location=location.belowbar, text = 'TradeCounting',size = size.tiny,textcolor = color.rgb(0, 255, 38),editable = showInStyle,force_overlay = true)
 bgcolor(startCount ? #ff81035c : na,force_overlay = true)
 
 whenClosed()
-
-
-

@@ -19,12 +19,11 @@ const GOLD_COLORS = {
   accent: '#FFD700',
 };
 
+// Original animated WelcomeScreen implementation
 const WelcomeScreen = ({ navigation }) => {
   const fadeAnim = React.useRef(new Animated.Value(0)).current;
-  
-  // Get screen width for responsive design
   const screenWidth = Dimensions.get('window').width;
-  const isLargeScreen = screenWidth >= 768; // Tablet/Desktop breakpoint
+  const isLargeScreen = screenWidth >= 768;
 
   React.useEffect(() => {
     Animated.timing(fadeAnim, {
@@ -38,8 +37,6 @@ const WelcomeScreen = ({ navigation }) => {
     <View style={styles.container}>
       <Animated.View style={[styles.content, { opacity: fadeAnim }]}>
         <View style={styles.logoContainer}>
-         
-         
             <Image
               source={require('./assets/mobile_logo.png')}
               style={styles.mobileLogo}
@@ -51,7 +48,6 @@ const WelcomeScreen = ({ navigation }) => {
         <Text style={styles.description}>
           Create a new wallet or import an existing one to get started
         </Text>
-
         <View style={styles.buttonContainer}>
           <TouchableOpacity
             style={styles.primaryButton}
@@ -59,7 +55,6 @@ const WelcomeScreen = ({ navigation }) => {
           >
             <Text style={styles.primaryButtonText}>Create Wallet</Text>
           </TouchableOpacity>
-
           <TouchableOpacity
             style={styles.secondaryButton}
             onPress={() => navigation.navigate('ImportWallet')}

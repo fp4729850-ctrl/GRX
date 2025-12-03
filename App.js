@@ -4,10 +4,13 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WalletProvider, useWallet } from './src/context/WalletContext';
 import { getWalletAddress, getAppLocked, setAppLocked } from './src/services/storageService';
 import { theme } from './src/styles/theme';
+
+// Import crypto polyfill for Android (must be imported before any crypto usage)
+import 'react-native-get-random-values';
 
 // Gold color constants
 const GOLD_COLORS = {
@@ -17,10 +20,12 @@ const GOLD_COLORS = {
   accent: '#FFD700',
 };
 
-// Polyfill Buffer for web
-if (Platform.OS === 'web') {
+// Polyfill Buffer for web and Android
+if (typeof global.Buffer === 'undefined') {
   global.Buffer = require('buffer').Buffer;
 }
+
+// crypto.getRandomValues is now polyfilled by react-native-get-random-values import above
 
 const isWeb = Platform.OS === 'web';
 
@@ -54,8 +59,10 @@ const iconMap = {
   Settings: { focused: 'settings', default: 'settings-outline', label: 'Settings' },
 };
 
-
+// Bottom tab navigator used after wallet is initialized
 const MainTabs = () => {
+  const insets = useSafeAreaInsets();
+  
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -64,40 +71,49 @@ const MainTabs = () => {
         tabBarActiveTintColor: GOLD_COLORS.primary,
         tabBarInactiveTintColor: theme.colors.textSecondary,
         tabBarLabelStyle: {
-          fontSize: 12,
-          fontWeight: '600',
-          marginTop: 4,
+          fontSize: 13,
+          fontWeight: '700',
+          marginTop: 2,
+          marginBottom: 2,
         },
         tabBarItemStyle: {
-          borderRadius: 16,
-          marginHorizontal: 6,
-          paddingVertical: 4,
+          borderRadius: 12,
+          marginHorizontal: 4,
+          paddingVertical: 6,
+          marginTop: 4,
         },
         tabBarStyle: {
           backgroundColor: theme.colors.surface,
           borderTopWidth: 2,
-          borderTopColor: GOLD_COLORS.light,
-          marginHorizontal: 16,
-          marginBottom: 16,
-          borderRadius: 24,
-          height: 70,
-          paddingBottom: 10,
-          paddingTop: 10,
-          shadowColor: GOLD_COLORS.primary,
-          shadowOpacity: 0.3,
-          shadowRadius: 12,
-          elevation: 12,
+          borderTopColor: GOLD_COLORS.primary,
+          marginHorizontal: 8,
+          marginBottom: 0,
+          borderRadius: 20,
+          height: 65 + (Platform.OS === 'android' ? insets.bottom : 0),
+          paddingBottom: Platform.OS === 'ios' ? insets.bottom + 4 : insets.bottom + 8,
+          paddingTop: 12,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: -2 },
+          shadowOpacity: 0.25,
+          shadowRadius: 8,
+          elevation: 15,
         },
-        tabBarIcon: ({ color, focused, size }) => {
+        tabBarIcon: ({ color, focused }) => {
           const icons = iconMap[route.name];
           const iconName = focused ? icons?.focused : icons?.default;
           return (
-            <View style={{
+            <View
+              style={{
               backgroundColor: focused ? GOLD_COLORS.light : 'transparent',
               padding: 8,
               borderRadius: 12,
-            }}>
-              <Ionicons name={iconName || 'ellipse'} size={focused ? 24 : 22} color={color} />
+              }}
+            >
+              <Ionicons
+                name={iconName || 'ellipse'}
+                size={focused ? 26 : 24}
+                color={color}
+              />
             </View>
           );
         },
@@ -282,6 +298,7 @@ const RootNavigator = () => {
     </NavigationContainer>
   );
 };
+
 
 export default function App() {
   return (
