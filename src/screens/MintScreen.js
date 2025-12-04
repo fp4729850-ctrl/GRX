@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Alert, ActivityIndicator } from "react-native";
+import React, { useState, useEffect, useRef } from "react";
+import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Alert, ActivityIndicator, AppState } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialIcons, Ionicons } from "@expo/vector-icons";
 import { theme } from "../styles/theme";
@@ -39,6 +39,45 @@ const MintScreen = () => {
   const [estimatedGRX, setEstimatedGRX] = useState("0");
   const [isMinting, setIsMinting] = useState(false);
   const [mintError, setMintError] = useState(null);
+  const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
+  const refreshIntervalRef = useRef(null);
+  const appState = useRef(AppState.currentState);
+
+  // Auto-refresh balance every 5 seconds when screen is active
+  useEffect(() => {
+    if (!walletAddress || !autoRefreshEnabled) {
+      return;
+    }
+
+    // Initial refresh
+    refreshBalance();
+
+    // Set up interval for auto-refresh
+    refreshIntervalRef.current = setInterval(() => {
+      refreshBalance();
+      refreshBalances(); // Also refresh wallet context balance
+    }, 5000); // Refresh every 5 seconds
+
+    // Handle app state changes (pause when app goes to background)
+    const subscription = AppState.addEventListener('change', (nextAppState) => {
+      if (
+        appState.current.match(/inactive|background/) &&
+        nextAppState === 'active'
+      ) {
+        // App came to foreground, refresh immediately
+        refreshBalance();
+        refreshBalances();
+      }
+      appState.current = nextAppState;
+    });
+
+    return () => {
+      if (refreshIntervalRef.current) {
+        clearInterval(refreshIntervalRef.current);
+      }
+      subscription?.remove();
+    };
+  }, [walletAddress, autoRefreshEnabled, refreshBalance, refreshBalances]);
 
   const calculateGRX = (usdAmount) => {
     if (!usdAmount || parseFloat(usdAmount) <= 0) {
@@ -140,19 +179,45 @@ const MintScreen = () => {
           <Text style={styles.balanceAmount}>
             {balanceLoading ? "..." : `${parseFloat(grxBalance || "0").toFixed(6)} GRX`}
           </Text>
-          <TouchableOpacity
-            style={styles.refreshBalanceButton}
-            onPress={refreshBalance}
-            disabled={balanceLoading}
-          >
-            <Ionicons 
-              name="refresh" 
-              size={16} 
-              color={GOLD_COLORS.primary} 
-              style={balanceLoading && { opacity: 0.5 }}
-            />
-            <Text style={styles.refreshBalanceText}>Refresh</Text>
-          </TouchableOpacity>
+          <View style={styles.balanceActions}>
+            <TouchableOpacity
+              style={styles.refreshBalanceButton}
+              onPress={refreshBalance}
+              disabled={balanceLoading}
+            >
+              <Ionicons 
+                name="refresh" 
+                size={16} 
+                color={GOLD_COLORS.primary} 
+                style={balanceLoading && { opacity: 0.5 }}
+              />
+              <Text style={styles.refreshBalanceText}>Refresh</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.autoRefreshButton,
+                autoRefreshEnabled && styles.autoRefreshButtonActive
+              ]}
+              onPress={() => setAutoRefreshEnabled(!autoRefreshEnabled)}
+            >
+              <Ionicons 
+                name={autoRefreshEnabled ? "sync" : "sync-outline"} 
+                size={16} 
+                color={autoRefreshEnabled ? "#FFFFFF" : GOLD_COLORS.primary}
+              />
+              <Text style={[
+                styles.autoRefreshText,
+                autoRefreshEnabled && styles.autoRefreshTextActive
+              ]}>
+                {autoRefreshEnabled ? "Auto" : "Off"}
+              </Text>
+            </TouchableOpacity>
+          </View>
+          {autoRefreshEnabled && (
+            <Text style={styles.autoRefreshHint}>
+              Auto-refreshing every 5 seconds
+            </Text>
+          )}
         </View>
 
         <View style={styles.infoCard}>
@@ -314,6 +379,11 @@ const styles = StyleSheet.create({
     color: GOLD_COLORS.dark,
     marginBottom: theme.spacing.sm,
   },
+  balanceActions: {
+    flexDirection: "row",
+    gap: theme.spacing.sm,
+    alignItems: "center",
+  },
   refreshBalanceButton: {
     flexDirection: "row",
     alignItems: "center",
@@ -329,6 +399,35 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "600",
     color: GOLD_COLORS.primary,
+  },
+  autoRefreshButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.spacing.xs,
+    paddingVertical: theme.spacing.xs,
+    paddingHorizontal: theme.spacing.sm,
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.borderRadius.sm,
+    borderWidth: 1,
+    borderColor: GOLD_COLORS.primary,
+  },
+  autoRefreshButtonActive: {
+    backgroundColor: GOLD_COLORS.primary,
+    borderColor: GOLD_COLORS.dark,
+  },
+  autoRefreshText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: GOLD_COLORS.primary,
+  },
+  autoRefreshTextActive: {
+    color: "#FFFFFF",
+  },
+  autoRefreshHint: {
+    fontSize: 10,
+    color: theme.colors.textSecondary,
+    marginTop: theme.spacing.xs,
+    fontStyle: "italic",
   },
   iconContainer: {
     width: 140,
