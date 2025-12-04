@@ -52,18 +52,14 @@ const SendScreen = ({ navigation }) => {
     ORACLE_SNAPSHOT_CONFIG.allowedWindowMinutes || 10;
 
   const {
-    privateKey,
     walletAddress,
-    currentNetwork,
-    isTestnet,
-    ethBalance,
-    usdtBalance,
+    grxBalance,
     custodialMode,
   } = useWallet();
   const [recipient, setRecipient] = useState('');
   const [amount, setAmount] = useState('');
   const [gasLimit, setGasLimit] = useState('');
-  const [tokenType, setTokenType] = useState('ETH'); // ETH, USDT, or GRX
+  const [tokenType, setTokenType] = useState('GRX'); // GRX only
   const [loading, setLoading] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [transactionFee, setTransactionFee] = useState('0');
@@ -86,9 +82,10 @@ const SendScreen = ({ navigation }) => {
   
   // Get GRX balance
   const {
-    balance: grxBalance,
+    balance: grxBalanceFromHook,
     loading: grxBalanceLoading,
-  } = useGRXBalance(walletAddress, currentNetwork, isTestnet);
+  } = useGRXBalance(walletAddress);
+  const displayGrxBalance = grxBalanceFromHook || grxBalance || '0';
 
   const {
     pricing,
@@ -398,9 +395,10 @@ const SendScreen = ({ navigation }) => {
     }
 
     try {
-      const gasPrice = await getGasPrice(currentNetwork, isTestnet);
-      const gas = gasLimit || estimatedGas || 21000n; // Default gas limit
-      const fee = (gas * gasPrice) / BigInt(10 ** 18);
+      // GRX chain uses fixed fee structure
+      // For now, use a default fee estimate
+      const gas = gasLimit || estimatedGas || 200000n; // Default gas limit for GRX
+      const fee = gas / BigInt(1000); // Simplified fee calculation
       setTransactionFee(fee.toString());
     } catch (error) {
       console.error('Error calculating fee:', error);
@@ -422,21 +420,11 @@ const SendScreen = ({ navigation }) => {
     }
 
     try {
-      const senderAddress = walletAddress || (await getWalletAddress());
-      const value = tokenType === 'ETH' 
-        ? ethers.parseEther(amount)
-        : '0x0'; // For token transfers, value is 0
-      
-      const gas = await estimateGas(
-        senderAddress,
-        recipient,
-        value,
-        '0x',
-        currentNetwork,
-        isTestnet
-      );
-      setEstimatedGas(gas);
-      setGasLimit(gas.toString());
+      // GRX chain gas estimation - use default for now
+      // In a real implementation, you would query the GRX chain for gas estimation
+      const defaultGas = 200000n; // Default gas for GRX transactions
+      setEstimatedGas(defaultGas);
+      setGasLimit(defaultGas.toString());
     } catch (error) {
       console.error('Error estimating gas:', error);
       
@@ -481,11 +469,8 @@ const SendScreen = ({ navigation }) => {
       return;
     }
 
-    const balance = tokenType === 'ETH' 
-      ? ethBalance 
-      : tokenType === 'USDT' 
-        ? usdtBalance 
-        : grxBalance || DUMMY_GRX_BALANCE;
+    // GRX chain only supports GRX tokens
+    const balance = grxBalance || DUMMY_GRX_BALANCE;
     if (parseFloat(amount) > parseFloat(balance)) {
       Alert.alert('Error', 'Insufficient balance');
       return;
@@ -513,8 +498,8 @@ const SendScreen = ({ navigation }) => {
           to: recipient,
           amount,
           token: tokenType,
-          network: currentNetwork,
-          isTestnet,
+          network: 'GRX',
+          isTestnet: false,
         });
         Alert.alert(
           'Request Submitted',
@@ -529,38 +514,25 @@ const SendScreen = ({ navigation }) => {
         return;
       }
 
-      let tx;
-      if (tokenType === 'ETH') {
-        tx = await sendTransaction(
-          privateKey,
-          recipient,
-          amount,
-          gasLimit || undefined,
-          currentNetwork,
-          isTestnet
-        );
-      } else if (tokenType === 'USDT') {
-        // USDT - need decimals (6 for USDT)
-        tx = await sendTokenTransaction(
-          privateKey,
-          recipient,
-          amount,
-          6, // USDT decimals
-          gasLimit || undefined,
-          currentNetwork,
-          isTestnet
-        );
-      } else if (tokenType === 'GRX') {
-        // GRX - 18 decimals
-        tx = await sendGRXTransaction(
-          privateKey,
-          recipient,
-          amount,
-          gasLimit || undefined,
-          currentNetwork,
-          isTestnet
-        );
-      }
+      // GRX chain only supports GRX token transfers
+      // Note: sendGRXTransaction, sendTransaction, and sendTokenTransaction functions
+      // may need to be updated for Cosmos/GRX chain compatibility
+      Alert.alert(
+        'Not Implemented',
+        'Direct GRX chain transactions are not yet implemented. Please use custodial mode or wait for Cosmos transaction support.',
+        [{ text: 'OK' }]
+      );
+      return;
+      
+      // TODO: Implement Cosmos/GRX chain transaction sending
+      // let tx;
+      // if (tokenType === 'GRX') {
+      //   tx = await sendGRXChainTransaction(
+      //     mnemonic,
+      //     recipient,
+      //     amount
+      //   );
+      // }
 
       Alert.alert('Success', `Transaction sent! Hash: ${tx.hash}`, [
         {
@@ -606,7 +578,7 @@ const SendScreen = ({ navigation }) => {
     gasLimit: custodialMode ? 'Backend managed' : gasLimit || 'Auto',
     fee: custodialMode
       ? 'Handled by GRX operations'
-      : `${transactionFee} ${currentNetwork === 'ETHEREUM' ? 'ETH' : 'BNB'}`,
+      : `${transactionFee} GRX`,
     mode: custodialMode ? 'Custodial (backend-managed)' : 'On-chain (self custody)',
   };
 
@@ -640,46 +612,14 @@ const SendScreen = ({ navigation }) => {
             <TouchableOpacity
               style={[
                 styles.tokenButton,
-                tokenType === 'ETH' && styles.tokenButtonActive,
+                styles.tokenButtonActive,
               ]}
-              onPress={() => setTokenType('ETH')}
+              disabled={true}
             >
               <Text
                 style={[
                   styles.tokenButtonText,
-                  tokenType === 'ETH' && styles.tokenButtonTextActive,
-                ]}
-              >
-                {currentNetwork === 'ETHEREUM' ? 'ETH' : 'BNB'}
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.tokenButton,
-                tokenType === 'USDT' && styles.tokenButtonActive,
-              ]}
-              onPress={() => setTokenType('USDT')}
-            >
-              <Text
-                style={[
-                  styles.tokenButtonText,
-                  tokenType === 'USDT' && styles.tokenButtonTextActive,
-                ]}
-              >
-                USDT
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.tokenButton,
-                tokenType === 'GRX' && styles.tokenButtonActive,
-              ]}
-              onPress={() => setTokenType('GRX')}
-            >
-              <Text
-                style={[
-                  styles.tokenButtonText,
-                  tokenType === 'GRX' && styles.tokenButtonTextActive,
+                  styles.tokenButtonTextActive,
                 ]}
               >
                 GRX
@@ -805,13 +745,9 @@ const SendScreen = ({ navigation }) => {
         <View style={styles.inputGroup}>
           <Text style={styles.label}>
             Amount (Balance: {
-              tokenType === 'ETH' 
-                ? ethBalance 
-                : tokenType === 'USDT' 
-                  ? usdtBalance 
-                  : grxBalanceLoading 
-                    ? '...' 
-                    : grxBalance || DUMMY_GRX_BALANCE
+              grxBalanceLoading 
+                ? '...' 
+                : grxBalance || DUMMY_GRX_BALANCE
             })
           </Text>
           <TextInput
@@ -872,7 +808,7 @@ const SendScreen = ({ navigation }) => {
           <Text style={styles.feeValue}>
             {custodialMode
               ? 'Handled by GRX backend'
-              : `${transactionFee} ${currentNetwork === 'ETHEREUM' ? 'ETH' : 'BNB'}`}
+              : `${transactionFee} GRX`}
           </Text>
         </View>
 

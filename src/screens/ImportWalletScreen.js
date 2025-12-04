@@ -10,16 +10,14 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
-import { validateMnemonicPhrase, deriveWalletFromMnemonic } from '../services/walletService';
+import { validateMnemonicPhrase } from '../services/walletService';
 import {
   storeMnemonic,
-  storePrivateKey,
   storeWalletAddress,
   getPINHash,
-  getCurrentNetwork,
-  getIsTestnet,
 } from '../services/storageService';
 import { importBackendWallet } from '../services/backendWalletService';
+import { getCosmosAddress } from '../services/grxChainService';
 import { useWallet } from '../context/WalletContext';
 import { theme } from '../styles/theme';
 
@@ -54,29 +52,26 @@ const ImportWalletScreen = ({ navigation }) => {
 
     setLoading(true);
     try {
-      // Derive wallet from mnemonic
-      const wallet = await deriveWalletFromMnemonic(trimmedMnemonic);
+      // Derive Cosmos address from mnemonic
+      const cosmosAddress = await getCosmosAddress(trimmedMnemonic);
 
       // Store securely
       await storeMnemonic(trimmedMnemonic);
-      await storePrivateKey(wallet.privateKey);
-      await storeWalletAddress(wallet.address);
+      await storeWalletAddress(cosmosAddress);
 
       // Best-effort: register imported wallet with backend if available
       try {
-        const network = (await getCurrentNetwork()) || 'ETHEREUM';
-        const isTestnet = await getIsTestnet();
         await importBackendWallet({
-          address: wallet.address,
-          network,
-          isTestnet: !!isTestnet,
+          address: cosmosAddress,
+          network: 'GRX',
+          isTestnet: false,
         });
       } catch (backendError) {
         console.warn('Backend wallet registration failed (import):', backendError?.message);
       }
 
       // Initialize wallet context
-      initializeWallet(wallet.address, wallet.privateKey);
+      initializeWallet(cosmosAddress);
 
       // Check if PIN exists, if not, set it up
       const pinHash = await getPINHash();

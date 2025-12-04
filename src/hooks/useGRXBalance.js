@@ -1,20 +1,9 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { AppState } from 'react-native';
-import { ethers } from 'ethers';
-import { getProvider } from '../services/networkService';
-import GRXToken from '../abis/GRXToken.json';
-import { GRX_TOKEN_ADDRESSES, GRX_TOKEN_METADATA } from '../utils/constants';
+import { fetchGRXBalance } from '../services/grxChainService';
+import { GRX_TOKEN_METADATA } from '../utils/constants';
 
-const { abi: GRX_ABI } = GRXToken;
-
-const resolveGrxAddress = (networkKey = 'ETHEREUM', isTestnet = false) => {
-  const normalized = networkKey?.toUpperCase() === 'BSC' ? 'BSC' : 'ETHEREUM';
-  const bucket = GRX_TOKEN_ADDRESSES[normalized];
-  if (!bucket) return null;
-  return isTestnet ? bucket.testnet : bucket.mainnet;
-};
-
-export const useGRXBalance = (address, networkKey = 'ETHEREUM', isTestnet = false) => {
+export const useGRXBalance = (address) => {
   const [balance, setBalance] = useState('0');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -27,21 +16,11 @@ export const useGRXBalance = (address, networkKey = 'ETHEREUM', isTestnet = fals
       return;
     }
 
-    const tokenAddress = resolveGrxAddress(networkKey, isTestnet);
-    if (!tokenAddress || tokenAddress === ethers.ZeroAddress) {
-      setError('GRX contract address missing for selected network');
-      setBalance('0');
-      return;
-    }
-
     try {
       setError(null);
       setLoading(true);
-      const provider = getProvider(networkKey, isTestnet);
-      const contract = new ethers.Contract(tokenAddress, GRX_ABI, provider);
-      const rawBalance = await contract.balanceOf(address);
-      const formatted = ethers.formatUnits(rawBalance, GRX_TOKEN_METADATA.decimals);
-      setBalance(formatted);
+      const balance = await fetchGRXBalance(address);
+      setBalance(balance || '0');
     } catch (err) {
       console.error('GRX balance fetch failed:', err);
       setError(err.message || 'Unable to fetch GRX balance');
@@ -49,7 +28,7 @@ export const useGRXBalance = (address, networkKey = 'ETHEREUM', isTestnet = fals
     } finally {
       setLoading(false);
     }
-  }, [address, networkKey, isTestnet]);
+  }, [address]);
 
   useEffect(() => {
     const handleAppStateChange = (nextAppState) => {

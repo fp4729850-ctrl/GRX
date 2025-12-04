@@ -23,7 +23,6 @@ import { theme } from "../styles/theme";
 import { fetchMetalPrices } from "../services/metalPriceService";
 import { fetchOracleSnapshot } from "../services/oracleSnapshotService";
 import { fetchCombinedTransactionHistory } from "../services/transactionHistoryService";
-import { NETWORKS } from "../utils/constants";
 
 // Gold color constants
 const GOLD_COLORS = {
@@ -59,27 +58,19 @@ const DUMMY_DATA = {
 const DashboardScreen = ({ navigation }) => {
   const {
     walletAddress,
-    currentNetwork,
-    isTestnet,
-    ethBalance,
-    usdtBalance,
-    ethBalanceUSD,
-    usdtBalanceUSD,
+    grxBalance,
     loading,
     refreshBalances,
-    refreshPrices,
-    updateNetwork,
     custodialMode,
   } = useWallet();
   const {
-    balance: grxBalance,
+    balance: grxBalanceFromHook,
     loading: grxBalanceLoading,
     error: grxBalanceError,
-  } = useGRXBalance(walletAddress, currentNetwork, isTestnet);
+  } = useGRXBalance(walletAddress);
   // Use dummy data if balance is not available
-  const displayGrxBalance = grxBalance || DUMMY_DATA.grxBalance;
+  const displayGrxBalance = grxBalanceFromHook || grxBalance || DUMMY_DATA.grxBalance;
   const formattedGrxBalance = parseFloat(displayGrxBalance || "0").toFixed(4);
-  const [isDropdownOpen, setDropdownOpen] = useState(false);
   const [metalTicker, setMetalTicker] = useState(null);
   const [metalError, setMetalError] = useState(null);
   const [oracleSnapshot, setOracleSnapshot] = useState(null);
@@ -87,13 +78,6 @@ const DashboardScreen = ({ navigation }) => {
   const [transactions, setTransactions] = useState([]);
   const [transactionsLoading, setTransactionsLoading] = useState(false);
   const scrollX = useRef(new Animated.Value(0)).current;
-  // Removed unused refs since transaction history auto-loading is disabled
-  // const transactionHistoryTimeoutRef = useRef(null);
-  // const isTransactionLoadingRef = useRef(false);
-  const networkOptions = [
-    { key: "ETHEREUM", label: "Ethereum" },
-    { key: "BSC", label: "BNB Chain" },
-  ];
   
   // Get screen width for responsive design
   const screenWidth = Dimensions.get("window").width;
@@ -104,7 +88,6 @@ const DashboardScreen = ({ navigation }) => {
     // DISABLED: loadTransactionHistory() - causes too many API calls
     const initialLoad = setTimeout(() => {
       refreshBalances();
-      refreshPrices();
       loadMetalPrices();
       loadOracleSnapshot();
       // loadTransactionHistory(); // Disabled to prevent rate limiting
@@ -228,8 +211,6 @@ const DashboardScreen = ({ navigation }) => {
     // Add delays between calls to avoid rate limiting
     await refreshBalances();
     await new Promise(resolve => setTimeout(resolve, 500));
-    await refreshPrices();
-    await new Promise(resolve => setTimeout(resolve, 500));
     await loadMetalPrices();
   };
 
@@ -238,16 +219,9 @@ const DashboardScreen = ({ navigation }) => {
     Alert.alert("Copied", "Wallet address copied to clipboard");
   };
 
-  const handleSelectNetwork = async (network) => {
-    setDropdownOpen(false);
-    updateNetwork(network, isTestnet);
-  };
-
   // Close dropdown when scrolling
   const handleScroll = () => {
-    if (isDropdownOpen) {
-      setDropdownOpen(false);
-    }
+    // No network dropdown anymore
   };
 
   return (
@@ -275,55 +249,6 @@ const DashboardScreen = ({ navigation }) => {
 
         {/* Top Bar */}
         <View style={styles.topBar}>
-          <View style={styles.networkSelector}>
-            <TouchableOpacity
-              style={styles.networkButton}
-              onPress={() => setDropdownOpen(!isDropdownOpen)}
-              activeOpacity={0.7}
-            >
-              <Ionicons 
-                name={currentNetwork === "ETHEREUM" ? "logo-ethereum" : "logo-firebase"} 
-                size={18} 
-                color={GOLD_COLORS.primary} 
-                style={{ marginRight: 8 }}
-              />
-              <Text style={styles.networkLabel}>
-                {currentNetwork === "ETHEREUM" ? "Ethereum" : "BNB Chain"}
-              </Text>
-              <Ionicons 
-                name={isDropdownOpen ? "chevron-up" : "chevron-down"} 
-                size={16} 
-                color={theme.colors.textSecondary} 
-                style={{ marginLeft: 4 }}
-              />
-            </TouchableOpacity>
-            {isDropdownOpen && (
-              <View style={styles.dropdownMenu}>
-                {networkOptions.map((option) => (
-                  <TouchableOpacity
-                    key={option.key}
-                    style={[
-                      styles.dropdownItem,
-                      currentNetwork === option.key &&
-                        styles.dropdownItemActive,
-                    ]}
-                    onPress={() => handleSelectNetwork(option.key)}
-                    activeOpacity={0.7}
-                  >
-                    <Text
-                      style={[
-                        styles.dropdownItemText,
-                        currentNetwork === option.key &&
-                          styles.dropdownItemTextActive,
-                      ]}
-                    >
-                      {option.label}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            )}
-          </View>
           {isLargeScreen && (
             <View style={styles.logoContainer}>
               <Image
@@ -333,6 +258,7 @@ const DashboardScreen = ({ navigation }) => {
               />
             </View>
           )}
+          <View style={{ flex: 1 }} />
           <TouchableOpacity
             style={styles.profileButton}
             onPress={() => navigation.navigate("Settings")}
@@ -452,8 +378,7 @@ const DashboardScreen = ({ navigation }) => {
             <Text style={styles.sectionOverline}>Portfolio Snapshot</Text>
             <View style={styles.networkPill}>
               <Text style={styles.networkPillText}>
-                {currentNetwork === "ETHEREUM" ? "Ethereum" : "BNB"} ·{" "}
-                {isTestnet ? "Testnet" : "Mainnet"}
+                GRX Chain
               </Text>
             </View>
           </View>
@@ -534,27 +459,6 @@ const DashboardScreen = ({ navigation }) => {
             {formattedGrxBalance} GRX
           </Text>
         </View>
-
-        <View style={styles.sectionHeaderRow}>
-          <MaterialIcons name="account-balance-wallet" size={20} color={GOLD_COLORS.primary} />
-          <Text style={styles.sectionOverline}>Assets</Text>
-        </View>
-        {/* Balance Cards */}
-        <BalanceCard
-          symbol={currentNetwork === "ETHEREUM" ? "ETH" : "BNB"}
-          balance={ethBalance || DUMMY_DATA.ethBalance}
-          usdBalance={ethBalanceUSD || DUMMY_DATA.ethBalanceUSD}
-          icon="💰"
-        />
-
-        <BalanceCard
-          symbol="USDT"
-          balance={usdtBalance || DUMMY_DATA.usdtBalance}
-          usdBalance={usdtBalanceUSD || DUMMY_DATA.usdtBalanceUSD}
-          icon="💵"
-        />
-
-     
 
         {/* Action Cards */}
         <View style={styles.sectionHeaderRow}>
@@ -652,17 +556,8 @@ const DashboardScreen = ({ navigation }) => {
                 return theme.colors.success;
               };
 
-              const network = isTestnet
-                ? currentNetwork === "ETHEREUM"
-                  ? NETWORKS.ETHEREUM_TESTNET
-                  : NETWORKS.BSC_TESTNET
-                : currentNetwork === "ETHEREUM"
-                ? NETWORKS.ETHEREUM_MAINNET
-                : NETWORKS.BSC_MAINNET;
-
-              const explorerUrl = tx.txHash
-                ? `${network.explorer}/tx/${tx.txHash}`
-                : null;
+              // TODO: Add GRX chain explorer URL when available
+              const explorerUrl = tx.txHash ? null : null;
 
               return (
                 <TouchableOpacity

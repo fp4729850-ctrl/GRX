@@ -1,19 +1,13 @@
 import React, { createContext, useState, useContext, useEffect, useRef } from 'react';
 import {
   getWalletAddress,
-  getCurrentNetwork,
-  getIsTestnet,
-  getPrivateKey,
-  storeCurrentNetwork,
-  setIsTestnet as storeIsTestnet,
+  getMnemonic,
   getCustodialMode,
   setCustodialMode as storeCustodialMode,
   storeWalletAddress,
 } from '../services/storageService';
 import { fetchUserWallets } from '../services/backendWalletService';
-import { getBalance, getTokenBalance } from '../services/networkService';
-import { fetchTokenPrices } from '../services/priceService';
-import { formatBalance } from '../utils/validation';
+import { fetchGRXBalance, getCosmosAddress } from '../services/grxChainService';
 
 const WalletContext = createContext();
 
@@ -27,14 +21,7 @@ export const useWallet = () => {
 
 export const WalletProvider = ({ children }) => {
   const [walletAddress, setWalletAddress] = useState(null);
-  const [privateKey, setPrivateKey] = useState(null);
-  const [currentNetwork, setCurrentNetwork] = useState('ETHEREUM'); // 'ETHEREUM' or 'BSC'
-  const [isTestnet, setIsTestnet] = useState(false);
-  const [ethBalance, setEthBalance] = useState('0');
-  const [usdtBalance, setUsdtBalance] = useState('0');
-  const [ethBalanceUSD, setEthBalanceUSD] = useState('0');
-  const [usdtBalanceUSD, setUsdtBalanceUSD] = useState('0');
-  const [prices, setPrices] = useState({ eth: 0, usdt: 1 });
+  const [grxBalance, setGrxBalance] = useState('0');
   const [loading, setLoading] = useState(false);
   const [isWalletInitialized, setIsWalletInitialized] = useState(false);
   const [custodialMode, setCustodialModeState] = useState(false);
@@ -46,7 +33,7 @@ export const WalletProvider = ({ children }) => {
     loadWalletData();
   }, []);
 
-  // Update balances when network or address changes (with debounce)
+  // Update balances when address changes (with debounce)
   useEffect(() => {
     if (walletAddress) {
       // Clear any pending refresh
@@ -56,7 +43,6 @@ export const WalletProvider = ({ children }) => {
       // Increased debounce to 3 seconds to avoid rate limiting
       refreshTimeoutRef.current = setTimeout(() => {
         refreshBalances();
-        refreshPrices();
       }, 3000);
     }
     return () => {
@@ -64,40 +50,49 @@ export const WalletProvider = ({ children }) => {
         clearTimeout(refreshTimeoutRef.current);
       }
     };
-  }, [walletAddress, currentNetwork, isTestnet]);
+  }, [walletAddress]);
 
   const loadWalletData = async () => {
     try {
       let address = await getWalletAddress();
-      const network = await getCurrentNetwork();
-      const testnet = await getIsTestnet();
       const custodial = await getCustodialMode();
-      const pk = await getPrivateKey();
 
-      // If no local address but backend is available and user is authenticated,
-      // try to pull the primary wallet from the backend.
+      // If no local address, try to derive from mnemonic
       if (!address) {
         try {
-          const wallets = await fetchUserWallets();
-          if (wallets && wallets.length > 0) {
-            const primary = wallets[0];
-            if (primary?.address) {
-              address = primary.address;
-              // Persist so subsequent app launches have fast local access
-              await storeWalletAddress(primary.address);
+          const mnemonic = await getMnemonic();
+          if (mnemonic) {
+            // Derive Cosmos address from mnemonic
+            address = await getCosmosAddress(mnemonic);
+            if (address) {
+              await storeWalletAddress(address);
             }
           }
-        } catch (backendError) {
-          // Silent failure – backend might not be configured or user not logged in yet
-          console.warn('Backend wallet sync skipped:', backendError?.message);
+        } catch (mnemonicError) {
+          console.warn('Could not derive address from mnemonic:', mnemonicError?.message);
+        }
+
+        // If still no address, try backend
+        if (!address) {
+          try {
+            const wallets = await fetchUserWallets();
+            if (wallets && wallets.length > 0) {
+              const primary = wallets[0];
+              if (primary?.address) {
+                address = primary.address;
+                // Persist so subsequent app launches have fast local access
+                await storeWalletAddress(primary.address);
+              }
+            }
+          } catch (backendError) {
+            // Silent failure – backend might not be configured or user not logged in yet
+            console.warn('Backend wallet sync skipped:', backendError?.message);
+          }
         }
       }
 
       if (address) {
         setWalletAddress(address);
-        setCurrentNetwork(network || 'ETHEREUM');
-        setIsTestnet(testnet || false);
-        setPrivateKey(pk);
         setIsWalletInitialized(true);
         setCustodialModeState(!!custodial);
       }
@@ -118,56 +113,16 @@ export const WalletProvider = ({ children }) => {
     isRefreshingRef.current = true;
     setLoading(true);
     try {
-      // Get native token balance
-      try {
-        const nativeBalance = await getBalance(walletAddress, currentNetwork, isTestnet);
-        setEthBalance(formatBalance(nativeBalance));
-      } catch (error) {
-        console.error('Error fetching native balance:', error);
-        setEthBalance('0');
-      }
-
-      // Get USDT balance with delay to avoid rate limiting
-      await new Promise(resolve => setTimeout(resolve, 200));
-      try {
-        const tokenData = await getTokenBalance(walletAddress, currentNetwork, isTestnet);
-        setUsdtBalance(formatBalance(tokenData.balance, tokenData.decimals));
-      } catch (error) {
-        console.error('Error fetching USDT balance:', error);
-        setUsdtBalance('0');
-      }
+      // Fetch GRX balance from Cosmos REST API
+      const balance = await fetchGRXBalance(walletAddress);
+      setGrxBalance(balance || '0');
     } catch (error) {
-      console.error('Error refreshing balances:', error);
-      // Set balances to zero on any error
-      setEthBalance('0');
-      setUsdtBalance('0');
+      console.error('Error refreshing GRX balance:', error);
+      setGrxBalance('0');
     } finally {
       setLoading(false);
       isRefreshingRef.current = false;
     }
-  };
-
-  const refreshPrices = async () => {
-    try {
-      const priceData = await fetchTokenPrices();
-      setPrices(priceData);
-
-      // Update USD balances
-      const ethUSD = (parseFloat(ethBalance) * priceData.eth).toFixed(2);
-      const usdtUSD = (parseFloat(usdtBalance) * priceData.usdt).toFixed(2);
-      setEthBalanceUSD(ethUSD);
-      setUsdtBalanceUSD(usdtUSD);
-    } catch (error) {
-      console.error('Error refreshing prices:', error);
-    }
-  };
-
-  const updateNetwork = async (network, testnet) => {
-    await storeCurrentNetwork(network);
-    await storeIsTestnet(testnet);
-    setCurrentNetwork(network);
-    setIsTestnet(testnet);
-    await refreshBalances();
   };
 
   const updateCustodialMode = async (enabled) => {
@@ -175,37 +130,23 @@ export const WalletProvider = ({ children }) => {
     setCustodialModeState(enabled);
   };
 
-  const initializeWallet = (address, pk) => {
+  const initializeWallet = (address) => {
     setWalletAddress(address);
-    setPrivateKey(pk);
     setIsWalletInitialized(true);
   };
 
   const clearWallet = () => {
     setWalletAddress(null);
-    setPrivateKey(null);
-    setEthBalance('0');
-    setUsdtBalance('0');
-    setEthBalanceUSD('0');
-    setUsdtBalanceUSD('0');
+    setGrxBalance('0');
     setIsWalletInitialized(false);
   };
 
   const value = {
     walletAddress,
-    privateKey,
-    currentNetwork,
-    isTestnet,
-    ethBalance,
-    usdtBalance,
-    ethBalanceUSD,
-    usdtBalanceUSD,
-    prices,
+    grxBalance,
     loading,
     isWalletInitialized,
     refreshBalances,
-    refreshPrices,
-    updateNetwork,
     custodialMode,
     updateCustodialMode,
     initializeWallet,

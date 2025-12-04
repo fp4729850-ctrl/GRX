@@ -9,15 +9,12 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
-import { deriveWalletFromMnemonic } from '../services/walletService';
 import {
   storeMnemonic,
-  storePrivateKey,
   storeWalletAddress,
-  getCurrentNetwork,
-  getIsTestnet,
 } from '../services/storageService';
 import { createBackendWallet } from '../services/backendWalletService';
+import { getCosmosAddress } from '../services/grxChainService';
 import { useWallet } from '../context/WalletContext';
 import { theme } from '../styles/theme';
 
@@ -101,29 +98,26 @@ const MnemonicConfirmScreen = ({ route, navigation }) => {
 
     setLoading(true);
     try {
-      // Derive wallet from mnemonic
-      const wallet = await deriveWalletFromMnemonic(mnemonic);
+      // Derive Cosmos address from mnemonic
+      const cosmosAddress = await getCosmosAddress(mnemonic);
 
       // Store securely
       await storeMnemonic(mnemonic);
-      await storePrivateKey(wallet.privateKey);
-      await storeWalletAddress(wallet.address);
+      await storeWalletAddress(cosmosAddress);
 
       // Best-effort: register wallet with backend if available
       try {
-        const network = (await getCurrentNetwork()) || 'ETHEREUM';
-        const isTestnet = await getIsTestnet();
         await createBackendWallet({
-          address: wallet.address,
-          network,
-          isTestnet: !!isTestnet,
+          address: cosmosAddress,
+          network: 'GRX',
+          isTestnet: false,
         });
       } catch (backendError) {
         console.warn('Backend wallet registration failed (create):', backendError?.message);
       }
 
       // Initialize wallet context
-      initializeWallet(wallet.address, wallet.privateKey);
+      initializeWallet(cosmosAddress);
 
       // Navigate to PIN setup, then dashboard
       navigation.navigate('PINSetup', {

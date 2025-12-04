@@ -1,3 +1,9 @@
+// CRITICAL: Polyfills must be imported FIRST, before any other imports
+import 'react-native-get-random-values';
+import { Buffer } from 'buffer';
+global.Buffer = Buffer;
+import 'text-encoding-polyfill';
+
 import React, { useState, useEffect } from 'react';
 import { AppState, Platform, View, TouchableOpacity, Text } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
@@ -9,9 +15,6 @@ import { WalletProvider, useWallet } from './src/context/WalletContext';
 import { getWalletAddress, getAppLocked, setAppLocked } from './src/services/storageService';
 import { theme } from './src/styles/theme';
 
-// Import crypto polyfill for Android (must be imported before any crypto usage)
-import 'react-native-get-random-values';
-
 // Gold color constants
 const GOLD_COLORS = {
   primary: '#D4AF37',
@@ -19,13 +22,6 @@ const GOLD_COLORS = {
   dark: '#B8941F',
   accent: '#FFD700',
 };
-
-// Polyfill Buffer for web and Android
-if (typeof global.Buffer === 'undefined') {
-  global.Buffer = require('buffer').Buffer;
-}
-
-// crypto.getRandomValues is now polyfilled by react-native-get-random-values import above
 
 const isWeb = Platform.OS === 'web';
 
