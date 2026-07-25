@@ -2,10 +2,10 @@
 export const GRX_CHAIN_CONFIG = {
   RPC_URL:
     (typeof process !== 'undefined' && process.env?.EXPO_PUBLIC_GRX_RPC_URL) ||
-    'http://localhost:26657',
+    'https://187.127.186.10.nip.io/rpc',
   REST_URL:
     (typeof process !== 'undefined' && process.env?.EXPO_PUBLIC_GRX_REST_URL) ||
-    'http://localhost:1317',
+    'https://187.127.186.10.nip.io/api',
   PREFIX: 'grx',
 };
 
@@ -18,11 +18,13 @@ export const STORAGE_KEYS = {
   PRIVATE_KEY: 'privateKey',
   WALLET_ADDRESS: 'walletAddress',
   PIN_HASH: 'pinHash',
+  PIN_VERIFIED_TIMESTAMP: 'pinVerifiedTimestamp',
   APP_LOCKED: 'appLocked',
   BIOMETRIC_ENABLED: 'biometricEnabled',
   CUSTODIAL_MODE: 'custodialMode',
   AUTH_TOKEN: 'authToken',
   INVOICES: 'grxInvoices',
+  MINT_TRANSACTIONS: 'grxMintTransactions',
 };
 
 // GRX Token metadata (Cosmos native token)
@@ -51,5 +53,44 @@ export const ORACLE_SNAPSHOT_CONFIG = {
       parseInt(process.env?.EXPO_PUBLIC_ORACLE_WINDOW_MINUTES)) ||
     10,
   pollIntervalMs: 30000, // 30 seconds
+};
+
+// Network configurations
+export const NETWORKS = {
+  ETHEREUM_MAINNET: {
+    name: 'Ethereum Mainnet',
+    chainId: 1,
+    rpcUrl: 'https://mainnet.infura.io/v3/5ac894977b43497b8851db51173be16a',
+    explorer: 'https://etherscan.io',
+    symbol: 'ETH',
+  },
+  ETHEREUM_TESTNET: {
+    name: 'Ethereum Sepolia',
+    chainId: 11155111,
+    rpcUrl: 'https://sepolia.infura.io/v3/5ac894977b43497b8851db51173be16a',
+    explorer: 'https://sepolia.etherscan.io',
+    symbol: 'ETH',
+  },
+  BSC_MAINNET: {
+    name: 'BNB Chain',
+    chainId: 56,
+    rpcUrl: 'https://bsc-mainnet.infura.io/v3/5ac894977b43497b8851db51173be16a',
+    explorer: 'https://bscscan.com',
+    symbol: 'BNB',
+  },
+  BSC_TESTNET: {
+    name: 'BNB Chain Testnet',
+    chainId: 97,
+    rpcUrl: 'https://data-seed-prebsc-1-s1.binance.org:8545/',
+    explorer: 'https://testnet.bscscan.com',
+    symbol: 'BNB',
+  },
+  GRX_MAINNET: {
+    name: 'GRX Chain',
+    chainId: 'grx-1',
+    rpcUrl: GRX_CHAIN_CONFIG.RPC_URL,
+    explorer: GRX_CHAIN_CONFIG.REST_URL.replace('/api', '') || 'https://187.127.186.10.nip.io/api',
+    symbol: 'GRX',
+  },
 };
 
