@@ -23,6 +23,7 @@ export const STORAGE_KEYS = {
   BIOMETRIC_ENABLED: 'biometricEnabled',
   CUSTODIAL_MODE: 'custodialMode',
   AUTH_TOKEN: 'authToken',
+  WALLET_MAPPINGS: 'walletMappings',
   INVOICES: 'grxInvoices',
   MINT_TRANSACTIONS: 'grxMintTransactions',
 };

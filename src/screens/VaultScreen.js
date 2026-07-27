@@ -148,6 +148,8 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.background,
   },
   content: {
+    height:"100vh",
+    overflow:"auto",
     padding: theme.spacing.lg,
   },
   header: {

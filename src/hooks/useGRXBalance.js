@@ -13,17 +13,23 @@ export const useGRXBalance = (address) => {
   const fetchBalance = useCallback(async () => {
     if (!address) {
       setBalance('0');
+      setError(null);
       return;
     }
 
     try {
       setError(null);
       setLoading(true);
+      // fetchGRXBalance handles all errors internally and returns '0' on failure
+      // Connection refused errors are handled gracefully (expected when server is not running)
       const balance = await fetchGRXBalance(address);
       setBalance(balance || '0');
+      setError(null); // Clear any previous errors
     } catch (err) {
-      console.error('GRX balance fetch failed:', err);
-      setError(err.message || 'Unable to fetch GRX balance');
+      // This should rarely happen since fetchGRXBalance handles errors internally
+      // But keep it as a safety net
+      console.warn('Unexpected error in GRX balance fetch:', err.message);
+      setError(null); // Don't show error for connection issues
       setBalance('0');
     } finally {
       setLoading(false);

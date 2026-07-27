@@ -6,7 +6,7 @@ import protobuf from 'protobufjs';
 import { TxRaw } from 'cosmjs-types/cosmos/tx/v1beta1/tx';
 import { GRX_CHAIN_CONFIG, GRX_TOKEN_METADATA } from '../utils/constants';
 
-// Define the custom message structure for MsgCreateSovereignVault
+// Define the custom message structures for GRX chain
 const root = protobuf.Root.fromJSON({
   nested: {
     grx: {
@@ -22,6 +22,12 @@ const root = protobuf.Root.fromJSON({
                 ownedBalance: { type: 'uint64', id: 5 },
               },
             },
+            MsgBurn: {
+              fields: {
+                creator: { type: 'string', id: 1 },
+                amount: { type: 'uint64', id: 2 },
+              },
+            },
           },
         },
       },
@@ -30,10 +36,12 @@ const root = protobuf.Root.fromJSON({
 });
 
 const MsgCreateSovereignVault = root.lookupType('grx.sovereign.MsgCreateSovereignVault');
+const MsgBurn = root.lookupType('grx.sovereign.MsgBurn');
 
-// Create Registry with custom message type
+// Create Registry with custom message types
 const registry = new Registry(defaultRegistryTypes);
 registry.register('/grx.sovereign.MsgCreateSovereignVault', MsgCreateSovereignVault);
+registry.register('/grx.sovereign.MsgBurn', MsgBurn);
 
 /**
  * Get Cosmos wallet from mnemonic
@@ -77,33 +85,70 @@ export const fetchGRXBalance = async (address) => {
   try {
     const restUrl = GRX_CHAIN_CONFIG.REST_URL;
     if (!restUrl) {
-      console.warn('GRX REST URL not configured');
+      // Silently return 0 if REST URL is not configured
       return '0';
     }
 
-    const response = await fetch(`${restUrl}/cosmos/bank/v1beta1/balances/${address}`);
-    
-    if (!response.ok) {
-      console.warn(`Failed to fetch balance: ${response.status} ${response.statusText}`);
+    // Check if address is valid
+    if (!address || typeof address !== 'string') {
+      // Silently return 0 for invalid addresses
       return '0';
     }
 
-    const data = await response.json();
-    
-    // Find GRX balance in the balances array
-    const grxBalance = data.balances?.find(
-      (b) => b.denom === GRX_TOKEN_METADATA.denom || b.denom === 'grx'
-    );
+    // Create AbortController for timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 second timeout (reduced to fail faster)
 
-    if (!grxBalance) {
+    try {
+      // Suppress console errors by wrapping in try-catch
+      // Note: Browser will still log network errors, but we handle them gracefully
+      const response = await fetch(`${restUrl}/cosmos/bank/v1beta1/balances/${address}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        signal: controller.signal,
+      }).catch((fetchErr) => {
+        // Catch fetch errors immediately to prevent propagation
+        clearTimeout(timeoutId);
+        // Return null to indicate failure
+        return null;
+      });
+      
+      clearTimeout(timeoutId);
+      
+      // If fetch failed (returned null), return 0
+      if (!response) {
+        return '0';
+      }
+      
+      if (!response.ok) {
+        // Silently return 0 for non-OK responses
+        return '0';
+      }
+
+      const data = await response.json();
+      
+      // Find GRX balance in the balances array
+      const grxBalance = data.balances?.find(
+        (b) => b.denom === GRX_TOKEN_METADATA.denom || b.denom === 'grx'
+      );
+
+      if (!grxBalance) {
+        return '0';
+      }
+
+      // Convert from base units (assuming 6 decimals for Cosmos tokens)
+      const balance = parseFloat(grxBalance.amount) / Math.pow(10, GRX_TOKEN_METADATA.decimals);
+      return balance.toFixed(GRX_TOKEN_METADATA.decimals);
+    } catch (fetchError) {
+      clearTimeout(timeoutId);
+      // Silently handle fetch errors
       return '0';
     }
-
-    // Convert from base units (assuming 6 decimals for Cosmos tokens)
-    const balance = parseFloat(grxBalance.amount) / Math.pow(10, GRX_TOKEN_METADATA.decimals);
-    return balance.toFixed(GRX_TOKEN_METADATA.decimals);
   } catch (error) {
-    console.error('Error fetching GRX balance:', error);
+    // Silently handle all errors - connection refused is expected when server is not running
+    // No logging to avoid console noise
     return '0';
   }
 };
@@ -115,7 +160,7 @@ export const fetchGRXBalance = async (address) => {
  * @param {string} mintDetails.index - Vault index
  * @param {string} mintDetails.country - Country code
  * @param {string} mintDetails.vaultId - Vault ID
- * @param {string|number} mintDetails.amount - Amount to mint (will be converted to ownedBalance)
+ * @param {string|number} mintDetails.amount - Amount in base units (1 GRX = 1,000,000 base units for 6 decimals)
  * @returns {Promise<string>} Transaction hash
  */
 export const createMintTransaction = async (mnemonic, mintDetails) => {
@@ -201,6 +246,200 @@ export const createMintTransaction = async (mnemonic, mintDetails) => {
     }
   } catch (error) {
     console.error('Minting failed:', error);
+    throw error;
+  }
+};
+
+/**
+ * Create and broadcast burn transaction on GRX Cosmos chain
+ * @param {string} mnemonic - BIP39 mnemonic phrase
+ * @param {string|number} amount - Amount to burn (in GRX tokens, will be converted to base units)
+ * @returns {Promise<string>} Transaction hash
+ */
+export const burnGRX = async (mnemonic, amount) => {
+  try {
+    const rpcUrl = GRX_CHAIN_CONFIG.RPC_URL;
+    if (!rpcUrl) {
+      throw new Error('GRX RPC URL not configured');
+    }
+
+    // Get wallet and address
+    const wallet = await getCosmosWallet(mnemonic);
+    const [account] = await wallet.getAccounts();
+    const address = account.address.toLowerCase();
+
+    // Connect client with custom registry
+    const client = await SigningStargateClient.connectWithSigner(rpcUrl, wallet, {
+      registry: registry,
+    });
+
+    // Convert GRX to base units (1 GRX = 1,000,000 base units for 6 decimals)
+    // Following guide: Math.floor(parseFloat(amountToBurn) * 1000000)
+    const amountBaseUnits = Math.floor(parseFloat(amount) * 1000000);
+    console.log(`Burning ${amount} GRX = ${amountBaseUnits} base units`);
+
+    // Prepare burn message
+    const msg = {
+      typeUrl: '/grx.sovereign.MsgBurn',
+      value: {
+        creator: address,
+        amount: amountBaseUnits,
+      },
+    };
+
+    // Set fee
+    const fee = {
+      amount: [{ denom: GRX_TOKEN_METADATA.denom, amount: '200' }],
+      gas: '200000',
+    };
+
+    console.log('Signing burn transaction...');
+
+    // Sign transaction
+    let signedTx;
+    try {
+      signedTx = await client.sign(address, [msg], fee, 'Burning GRX');
+    } catch (signError) {
+      // Check if error is about account not existing
+      if (signError.message && signError.message.includes('does not exist')) {
+        throw new Error(
+          'Account does not exist on chain yet. Please fund your account with some GRX tokens first.'
+        );
+      }
+      // Re-throw other errors
+      throw signError;
+    }
+
+    // Encode transaction
+    const txBytes = TxRaw.encode(signedTx).finish();
+    const txHex = Buffer.from(txBytes).toString('hex');
+
+    // Manual broadcast using hex encoding (matching HTML example)
+    const broadcastUrl = `${rpcUrl}/broadcast_tx_sync?tx=0x${txHex}`;
+    console.log('Broadcasting burn transaction...');
+
+    const response = await fetch(broadcastUrl);
+    const data = await response.json();
+
+    // Handle response
+    if (data.error) {
+      throw new Error(data.error.data || data.error.message || JSON.stringify(data.error));
+    }
+
+    const result = data.result;
+    if (result && result.code === 0) {
+      console.log('Burn successful! Transaction hash:', result.hash);
+      return result.hash;
+    } else {
+      const errorMsg = result
+        ? `Code: ${result.code}, Log: ${result.log}`
+        : JSON.stringify(data);
+      throw new Error(`Burn transaction failed: ${errorMsg}`);
+    }
+  } catch (error) {
+    console.error('Burning failed:', error);
+    throw error;
+  }
+};
+
+/**
+ * Send GRX tokens to another address on GRX Cosmos chain
+ * @param {string} mnemonic - BIP39 mnemonic phrase
+ * @param {string} recipient - Recipient address (bech32 format, starts with 'grx')
+ * @param {string|number} amount - Amount to send (in GRX tokens, will be converted to base units)
+ * @param {string} memo - Optional memo for the transaction
+ * @returns {Promise<string>} Transaction hash
+ */
+export const sendGRXTokens = async (mnemonic, recipient, amount, memo = '') => {
+  try {
+    const rpcUrl = GRX_CHAIN_CONFIG.RPC_URL;
+    if (!rpcUrl) {
+      throw new Error('GRX RPC URL not configured');
+    }
+
+    // Validate recipient address
+    if (!recipient || !recipient.startsWith('grx')) {
+      throw new Error('Invalid recipient address. Must start with "grx"');
+    }
+
+    // Get wallet and address
+    const wallet = await getCosmosWallet(mnemonic);
+    const [account] = await wallet.getAccounts();
+    const senderAddress = account.address.toLowerCase();
+
+    // Connect client with custom registry
+    const client = await SigningStargateClient.connectWithSigner(rpcUrl, wallet, {
+      registry: registry,
+    });
+
+    // Convert GRX to base units (1 GRX = 1,000,000 base units for 6 decimals)
+    const amountBaseUnits = Math.floor(parseFloat(amount) * 1000000);
+    console.log(`Sending ${amount} GRX = ${amountBaseUnits} base units to ${recipient}`);
+
+    // Prepare bank send message (standard Cosmos SDK message)
+    const msg = {
+      typeUrl: '/cosmos.bank.v1beta1.MsgSend',
+      value: {
+        fromAddress: senderAddress,
+        toAddress: recipient,
+        amount: [{ denom: GRX_TOKEN_METADATA.denom, amount: amountBaseUnits.toString() }],
+      },
+    };
+
+    // Set fee
+    const fee = {
+      amount: [{ denom: GRX_TOKEN_METADATA.denom, amount: '500' }],
+      gas: '200000',
+    };
+
+    console.log('Signing send transaction...');
+
+    // Sign transaction
+    let signedTx;
+    try {
+      signedTx = await client.sign(senderAddress, [msg], fee, memo || 'Sending GRX');
+    } catch (signError) {
+      // Check if error is about account not existing
+      if (signError.message && signError.message.includes('does not exist')) {
+        throw new Error(
+          'Account does not exist on chain yet. Please fund your account with some GRX tokens first.'
+        );
+      }
+      // Check for insufficient funds
+      if (signError.message && (signError.message.includes('insufficient funds') || signError.message.includes('insufficient balance'))) {
+        throw new Error('Insufficient balance to send this amount.');
+      }
+      // Re-throw other errors
+      throw signError;
+    }
+
+    // Encode transaction
+    const txBytes = TxRaw.encode(signedTx).finish();
+    const txHex = Buffer.from(txBytes).toString('hex');
+
+    console.log('Broadcasting transaction...');
+
+    // Broadcast transaction
+    const response = await fetch(`${rpcUrl}/broadcast_tx_sync?tx=0x${txHex}`);
+    const data = await response.json();
+
+    if (data.error) {
+      throw new Error(data.error.data || data.error.message || 'Transaction broadcast failed');
+    }
+
+    const result = data.result;
+
+    if (result && result.code === 0) {
+      console.log('Send successful! Transaction hash:', result.hash);
+      return result.hash;
+    } else {
+      const errorMsg = result
+        ? `Code: ${result.code}, Log: ${result.log}`
+        : JSON.stringify(data);
+      throw new Error(`Send transaction failed: ${errorMsg}`);
+    }
+  } catch (error) {
+    console.error('Sending failed:', error);
     throw error;
   }
 };

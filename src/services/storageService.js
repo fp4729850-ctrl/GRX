@@ -393,3 +393,67 @@ export const clearAuthToken = async () => {
   }
 };
 
+/**
+ * Get Wallet Address Mappings
+ */
+export const getWalletMappings = async () => {
+  try {
+    const data = isWeb
+      ? await AsyncStorage.getItem(STORAGE_KEYS.WALLET_MAPPINGS)
+      : await SecureStore.getItemAsync(STORAGE_KEYS.WALLET_MAPPINGS);
+    return data ? JSON.parse(data) : [];
+  } catch (error) {
+    console.error('Error getting wallet mappings:', error);
+    return [];
+  }
+};
+
+/**
+ * Save Wallet Address Mapping
+ */
+export const saveWalletMapping = async (country, address) => {
+  try {
+    const mappings = await getWalletMappings();
+    
+    // Check if address already exists and update it, else push new mapping
+    const existingIndex = mappings.findIndex(m => m.address.toLowerCase() === address.toLowerCase());
+    
+    if (existingIndex >= 0) {
+      mappings[existingIndex].country = country;
+    } else {
+      mappings.push({ id: Date.now().toString(), country, address });
+    }
+    
+    const stringData = JSON.stringify(mappings);
+    if (isWeb) {
+      await AsyncStorage.setItem(STORAGE_KEYS.WALLET_MAPPINGS, stringData);
+    } else {
+      await SecureStore.setItemAsync(STORAGE_KEYS.WALLET_MAPPINGS, stringData);
+    }
+    return { success: true, mappings };
+  } catch (error) {
+    console.error('Error saving wallet mapping:', error);
+    return { success: false, error: 'Failed to save mapping' };
+  }
+};
+
+/**
+ * Delete Wallet Address Mapping
+ */
+export const deleteWalletMapping = async (address) => {
+  try {
+    const mappings = await getWalletMappings();
+    const updatedMappings = mappings.filter(m => m.address.toLowerCase() !== address.toLowerCase());
+    
+    const stringData = JSON.stringify(updatedMappings);
+    if (isWeb) {
+      await AsyncStorage.setItem(STORAGE_KEYS.WALLET_MAPPINGS, stringData);
+    } else {
+      await SecureStore.setItemAsync(STORAGE_KEYS.WALLET_MAPPINGS, stringData);
+    }
+    return { success: true, mappings: updatedMappings };
+  } catch (error) {
+    console.error('Error deleting wallet mapping:', error);
+    return { success: false, error: 'Failed to delete mapping' };
+  }
+};

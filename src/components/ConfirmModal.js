@@ -5,13 +5,11 @@ import {
   StyleSheet,
   Modal,
   TouchableOpacity,
-  TextInput,
   Alert,
   ActivityIndicator,
   Platform,
 } from 'react-native';
 import * as LocalAuthentication from 'expo-local-authentication';
-import { getPINHash } from '../services/storageService';
 import { theme } from '../styles/theme';
 
 const isWeb = Platform.OS === 'web';
@@ -25,7 +23,6 @@ const ConfirmModal = ({
   snapshotCard,
   children,
 }) => {
-  const [pin, setPin] = useState('');
   const [verifying, setVerifying] = useState(false);
 
   const handleBiometricAuth = async () => {
@@ -49,6 +46,7 @@ const ConfirmModal = ({
       });
 
       if (result.success) {
+        // Call onConfirm without PIN check (parent handles PIN verification)
         onConfirm();
       }
     } catch (error) {
@@ -58,26 +56,9 @@ const ConfirmModal = ({
   };
 
   const handlePINConfirm = async () => {
-    if (!pin) {
-      Alert.alert('Error', 'Please enter your PIN');
-      return;
-    }
-
-    setVerifying(true);
-    try {
-      const storedPINHash = await getPINHash();
-      // Simple PIN verification (in production, use proper hashing)
-      if (storedPINHash && storedPINHash === pin) {
-        setPin('');
-        onConfirm();
-      } else {
-        Alert.alert('Error', 'Invalid PIN');
-      }
-    } catch (error) {
-      Alert.alert('Error', 'Failed to verify PIN');
-    } finally {
-      setVerifying(false);
-    }
+    // PIN verification is handled by parent component
+    // Just call onConfirm to proceed
+    onConfirm();
   };
 
   return (
@@ -142,27 +123,15 @@ const ConfirmModal = ({
               </Text>
             </TouchableOpacity>
 
-            <Text style={styles.orText}>OR</Text>
-
-            <TextInput
-              style={styles.pinInput}
-              value={pin}
-              onChangeText={setPin}
-              placeholder="Enter PIN"
-              secureTextEntry
-              keyboardType="numeric"
-              maxLength={6}
-            />
-
             <TouchableOpacity
-              style={[styles.confirmButton, verifying && styles.buttonDisabled]}
+              style={[styles.confirmButton, (verifying || loading) && styles.buttonDisabled]}
               onPress={handlePINConfirm}
               disabled={verifying || loading}
             >
               {verifying || loading ? (
                 <ActivityIndicator color={theme.colors.secondary} />
               ) : (
-                <Text style={styles.confirmButtonText}>Confirm</Text>
+                <Text style={styles.confirmButtonText}>Confirm Transaction</Text>
               )}
             </TouchableOpacity>
           </View>
@@ -236,21 +205,6 @@ const styles = StyleSheet.create({
     color: theme.colors.secondary,
     fontSize: 16,
     fontWeight: '600',
-  },
-  orText: {
-    textAlign: 'center',
-    color: theme.colors.textSecondary,
-    marginVertical: theme.spacing.sm,
-  },
-  pinInput: {
-    backgroundColor: theme.colors.background,
-    padding: theme.spacing.md,
-    borderRadius: theme.borderRadius.md,
-    fontSize: 18,
-    textAlign: 'center',
-    marginBottom: theme.spacing.md,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
   },
   confirmButton: {
     backgroundColor: theme.colors.primary,

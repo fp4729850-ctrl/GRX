@@ -22,16 +22,17 @@ const GOLD_COLORS = {
   accent: "#FFD700",
 };
 import { useGRXBalance } from "../hooks/useGRXBalance";
-import { useOracleSnapshot } from "../hooks/useOracleSnapshot";
 import { fetchGrxOracleQuote } from "../services/oracleService";
-import { fetchOracleSnapshot } from "../services/oracleSnapshotService";
 import { burnGrxWithInvoice } from "../services/grxService";
+import { burnGRX } from "../services/grxChainService";
+import { getMnemonic } from "../services/storageService";
 import { saveInvoice, createBackendInvoice } from "../services/invoiceService";
 import { redeemCustodialInvoice } from "../services/custodialService";
+import { generateInvoiceId } from "../utils/generateInvoiceId";
+import { verifyPIN, isPINSet } from "../services/pinService";
 import ConfirmModal from "../components/ConfirmModal";
-import OracleSnapshotCard from "../components/OracleSnapshotCard";
 import { theme } from "../styles/theme";
-import { ORACLE_SNAPSHOT_CONFIG, GRX_TOKEN_METADATA } from "../utils/constants";
+import { GRX_TOKEN_METADATA } from "../utils/constants";
 
 // Dummy data for testing when APIs fail
 const DUMMY_QUOTE = {
@@ -59,14 +60,9 @@ const RedeemScreen = ({ navigation }) => {
   const [quoteLoading, setQuoteLoading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [showPINPrompt, setShowPINPrompt] = useState(false);
+  const [pinInput, setPinInput] = useState("");
   const [successData, setSuccessData] = useState(null);
-  const [snapshotForConfirm, setSnapshotForConfirm] = useState(null);
-  const [snapshotLoading, setSnapshotLoading] = useState(false);
-  const [snapshotError, setSnapshotError] = useState(null);
-
-  // Use oracle snapshot hook (no polling when not in confirm flow)
-  const { snapshot: backgroundSnapshot, refresh: refreshSnapshot } =
-    useOracleSnapshot(0, false);
 
   useEffect(() => {
     if (!amount) {
@@ -120,26 +116,9 @@ const RedeemScreen = ({ navigation }) => {
     return Number.isFinite(parsed) ? parsed : parseFloat(DUMMY_BALANCE);
   }, [grxBalance]);
 
-  const validateSnapshotFreshness = (snapshot) => {
-    if (!snapshot || !snapshot.timestamp) {
-      return { valid: false, error: "Oracle snapshot unavailable" };
-    }
-
-    const snapshotTime = new Date(snapshot.timestamp);
-    const now = new Date();
-    const ageMinutes = (now - snapshotTime) / (1000 * 60);
-
-    if (ageMinutes > ORACLE_SNAPSHOT_CONFIG.allowedWindowMinutes) {
-      return {
-        valid: false,
-        error: `Snapshot too old (${Math.round(ageMinutes)} minutes). Please refresh.`,
-      };
-    }
-
-    return { valid: true };
-  };
-
   const handleReview = async () => {
+    console.log("handleReview called, amount:", amount);
+    
     if (!amount || Number(amount) <= 0) {
       Alert.alert("Invalid Amount", "Enter a burn amount greater than zero.");
       return;
@@ -150,65 +129,47 @@ const RedeemScreen = ({ navigation }) => {
       return;
     }
 
-    // Fetch fresh snapshot before showing confirm modal
-    setSnapshotLoading(true);
-    setSnapshotError(null);
-    setSnapshotForConfirm(null);
-
-    try {
-      // Force refresh snapshot by fetching directly
-      const freshSnapshot = await fetchOracleSnapshot();
-
-      const snapshot = {
-        id: freshSnapshot?.id || freshSnapshot?.snapshotId,
-        timestamp: freshSnapshot?.timestamp || freshSnapshot?.updatedAt,
-        goldPerGramUSD:
-          freshSnapshot?.goldPerGramUSD || freshSnapshot?.goldPriceUSD,
-        fx:
-          typeof freshSnapshot?.fx === "string"
-            ? JSON.parse(freshSnapshot.fx)
-            : freshSnapshot?.fx || {},
-        signature: freshSnapshot?.signature,
-        sources: freshSnapshot?.sources || freshSnapshot?.source
-          ? [freshSnapshot.source]
-          : [],
-      };
-
-      const validation = validateSnapshotFreshness(snapshot);
-      if (!validation.valid) {
-        setSnapshotError(validation.error);
-        Alert.alert("Oracle Snapshot Error", validation.error);
-        return;
-      }
-
-      setSnapshotForConfirm(snapshot);
-      setShowConfirm(true);
-    } catch (error) {
-      console.error("Failed to fetch oracle snapshot:", error);
-      setSnapshotError(error.message || "Failed to fetch oracle snapshot");
-      Alert.alert(
-        "Oracle Snapshot Error",
-        "Unable to fetch oracle snapshot. Please try again."
-      );
-    } finally {
-      setSnapshotLoading(false);
-    }
+    // Show confirm modal directly without snapshot
+    setShowConfirm(true);
   };
 
   const handleConfirmBurn = async () => {
-    // Validate snapshot one more time before proceeding
-    if (!snapshotForConfirm) {
-      Alert.alert("Error", "Oracle snapshot is required for redemption.");
+    // Check if PIN is set and verify before proceeding
+    const pinSet = await isPINSet();
+    if (pinSet) {
+      // Show PIN prompt
+      setShowConfirm(false);
+      setShowPINPrompt(true);
+      setPinInput("");
+    } else {
+      // No PIN set, proceed directly
+      executeBurn();
+    }
+  };
+
+  const handlePINSubmit = async () => {
+    if (!pinInput || pinInput.length < 4) {
+      Alert.alert('Error', 'Please enter at least 4-digit PIN');
       return;
     }
 
-    const validation = validateSnapshotFreshness(snapshotForConfirm);
-    if (!validation.valid) {
-      Alert.alert("Oracle Snapshot Error", validation.error);
+    const result = await verifyPIN(pinInput);
+    if (!result.success) {
+      Alert.alert('Error', result.error || 'Invalid PIN');
+      setPinInput("");
       return;
     }
 
+    // PIN verified, proceed with burn
+    setShowPINPrompt(false);
+    setPinInput("");
+    executeBurn();
+  };
+
+  const executeBurn = async () => {
+    // Ensure modals are closed
     setShowConfirm(false);
+    setShowPINPrompt(false);
     setLoading(true);
     try {
       if (custodialMode) {
@@ -234,7 +195,6 @@ const RedeemScreen = ({ navigation }) => {
           feeUSD: quote?.feeUSD ?? null,
           pricePerToken: quote?.pricePerToken ?? null,
           status: response?.status || "queued",
-          snapshotId: snapshotForConfirm.id,
         });
 
         setSuccessData({
@@ -243,71 +203,132 @@ const RedeemScreen = ({ navigation }) => {
           timestamp,
           burned: amount,
           custodial: true,
-          snapshotId: snapshotForConfirm.id,
         });
         setAmount("");
-        setSnapshotForConfirm(null);
         return;
       }
 
-      // Non-custodial: on-chain burn with invoice
-      const amountWei = ethers.parseUnits(
-        amount,
-        GRX_TOKEN_METADATA.decimals
-      );
-      const timestamp = new Date().toISOString();
+      // Check if using GRX Cosmos chain (address starts with "grx")
+      const isGRXCosmosChain = walletAddress && walletAddress.toLowerCase().startsWith('grx');
 
-      const { tx, invoiceId, receipt, amountWei: returnedAmountWei } =
-        await burnGrxWithInvoice({
-          privateKey,
+      if (isGRXCosmosChain) {
+        // GRX Cosmos chain burn (following guide pattern)
+        const mnemonic = await getMnemonic();
+        if (!mnemonic) {
+          throw new Error('Wallet mnemonic not found. Please unlock your wallet.');
+        }
+
+        const timestamp = new Date().toISOString();
+        
+        // Convert GRX to base units (1 GRX = 1,000,000 base units for 6 decimals)
+        // Following guide: Math.floor(parseFloat(amountToBurn) * 1000000)
+        const amountInBaseUnits = Math.floor(parseFloat(amount) * 1000000);
+        const amountWei = amountInBaseUnits.toString();
+
+        // Generate invoice ID for Cosmos burn
+        // For Cosmos burns, use empty string as recipient (not ethers.ZeroAddress)
+        const invoiceId = generateInvoiceId(walletAddress, "", amountWei);
+
+        console.log('Burning GRX:', amount, 'GRX =', amountInBaseUnits, 'base units');
+        
+        // Burn on GRX Cosmos chain
+        // burnGRX will convert GRX to base units internally (1 GRX = 1,000,000 base units)
+        const txHash = await burnGRX(mnemonic, amount);
+        
+        console.log('Burn transaction submitted, hash:', txHash);
+
+        // POST to backend /api/invoice/create
+        try {
+          await createBackendInvoice({
+            invoiceId,
+            txHash,
+            amountWei,
+            timestamp,
+            sender: walletAddress,
+          });
+        } catch (backendError) {
+          console.error("Backend invoice creation failed:", backendError);
+          // Continue even if backend fails - local save will still work
+        }
+
+        // Save invoice locally
+        await saveInvoice({
+          id: invoiceId,
+          txHash,
           amount,
-          networkKey: currentNetwork,
-          isTestnet,
-          senderAddress: walletAddress,
-        });
-
-      // POST to backend /api/invoice/create with snapshot data
-      try {
-        await createBackendInvoice({
-          invoiceId,
-          txHash: tx.hash,
-          snapshotId: snapshotForConfirm.id,
-          snapshotSignature: snapshotForConfirm.signature,
-          amountWei: returnedAmountWei || amountWei.toString(),
           timestamp,
-          sender: walletAddress,
+          network: 'GRX',
+          isTestnet: false,
+          totalUSD: quote?.totalUSD ?? null,
+          feeUSD: quote?.feeUSD ?? null,
+          pricePerToken: quote?.pricePerToken ?? null,
+          status: "confirmed",
         });
-      } catch (backendError) {
-        console.error("Backend invoice creation failed:", backendError);
-        // Continue even if backend fails - local save will still work
+
+        refreshGrxBalance();
+        setSuccessData({
+          txHash,
+          invoiceId,
+          timestamp,
+          burned: amount,
+          custodial: false,
+        });
+        setAmount("");
+      } else {
+        // Ethereum/BSC chain burn with invoice
+        const amountWei = ethers.parseUnits(
+          amount,
+          GRX_TOKEN_METADATA.decimals
+        );
+        const timestamp = new Date().toISOString();
+
+        const { tx, invoiceId, receipt, amountWei: returnedAmountWei } =
+          await burnGrxWithInvoice({
+            privateKey,
+            amount,
+            networkKey: currentNetwork,
+            isTestnet,
+            senderAddress: walletAddress,
+          });
+
+        // POST to backend /api/invoice/create
+        try {
+          await createBackendInvoice({
+            invoiceId,
+            txHash: tx.hash,
+            amountWei: returnedAmountWei || amountWei.toString(),
+            timestamp,
+            sender: walletAddress,
+          });
+        } catch (backendError) {
+          console.error("Backend invoice creation failed:", backendError);
+          // Continue even if backend fails - local save will still work
+        }
+
+        // Save invoice locally
+        await saveInvoice({
+          id: invoiceId,
+          txHash: tx.hash,
+          amount,
+          timestamp,
+          network: currentNetwork,
+          isTestnet,
+          totalUSD: quote?.totalUSD ?? null,
+          feeUSD: quote?.feeUSD ?? null,
+          pricePerToken: quote?.pricePerToken ?? null,
+          status: "confirmed",
+        });
+
+        refreshGrxBalance();
+        setSuccessData({
+          txHash: tx.hash,
+          invoiceId,
+          timestamp,
+          burned: amount,
+          custodial: false,
+        });
+        setAmount("");
       }
-
-      // Save invoice locally
-      await saveInvoice({
-        id: invoiceId,
-        txHash: tx.hash,
-        amount,
-        timestamp,
-        network: currentNetwork,
-        isTestnet,
-        totalUSD: quote?.totalUSD ?? null,
-        feeUSD: quote?.feeUSD ?? null,
-        pricePerToken: quote?.pricePerToken ?? null,
-        status: "confirmed",
-        snapshotId: snapshotForConfirm.id,
-      });
-
-      refreshGrxBalance();
-      setSuccessData({
-        txHash: tx.hash,
-        invoiceId,
-        timestamp,
-        burned: amount,
-        custodial: false,
-        snapshotId: snapshotForConfirm.id,
-      });
-      setAmount("");
-      setSnapshotForConfirm(null);
     } catch (error) {
       console.error("Redeem error:", error);
       Alert.alert(
@@ -317,7 +338,6 @@ const RedeemScreen = ({ navigation }) => {
           {
             text: "Retry",
             onPress: () => {
-              // Re-fetch snapshot and show confirm again
               handleReview();
             },
           },
@@ -384,14 +404,6 @@ const RedeemScreen = ({ navigation }) => {
             <Text style={styles.detailLabel}>Timestamp</Text>
             <Text style={styles.detailValue}>{successData.timestamp}</Text>
           </View>
-          {successData.snapshotId && (
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Snapshot ID</Text>
-              <Text style={styles.detailValue} numberOfLines={1}>
-                {successData.snapshotId}
-              </Text>
-            </View>
-          )}
 
           <TouchableOpacity
             style={styles.primaryButton}
@@ -427,7 +439,6 @@ const RedeemScreen = ({ navigation }) => {
             ? "Custodial wallet enabled · GRX operators will execute admin burnWithInvoice."
             : "You will submit an on-chain burnWithInvoice transaction from this device."}
         </Text>
-        <Text style={styles.snapshotText}>Using snapshot for settlement.</Text>
       </View>
 
       <View style={styles.card}>
@@ -454,48 +465,19 @@ const RedeemScreen = ({ navigation }) => {
         />
       </View>
 
-      <View style={styles.card}>
-        <View style={styles.cardHeader}>
-          <MaterialIcons name="insights" size={24} color={GOLD_COLORS.primary} />
-          <Text style={styles.cardLabel}>Oracle Quote</Text>
-        </View>
-        {quoteLoading ? (
-          <ActivityIndicator color={theme.colors.primary} />
-        ) : quote ? (
-          <>
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Price / GRX</Text>
-              <Text style={styles.detailValue}>
-                ${Number(quote.pricePerToken).toFixed(2)}
-              </Text>
-            </View>
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Fees</Text>
-              <Text style={styles.detailValue}>
-                ${Number(quote.feeUSD).toFixed(2)}
-              </Text>
-            </View>
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Payout (USD)</Text>
-              <Text style={styles.detailValue}>
-                ${Number(quote.totalUSD).toFixed(2)}
-              </Text>
-            </View>
-          </>
-        ) : (
-          <Text style={styles.cardHint}>Enter an amount to fetch latest price.</Text>
-        )}
-      </View>
-
       <TouchableOpacity
         style={[
           styles.primaryButton,
-          (loading || snapshotLoading) && styles.buttonDisabled,
+          loading && styles.buttonDisabled,
         ]}
-        onPress={handleReview}
-        disabled={loading || snapshotLoading}
+        onPress={() => {
+          console.log("Review Burn button pressed");
+          handleReview();
+        }}
+        disabled={loading}
+        activeOpacity={0.7}
       >
-        {loading || snapshotLoading ? (
+        {loading ? (
           <ActivityIndicator color={theme.colors.secondary} />
         ) : (
           <Text style={styles.primaryButtonText}>Review Burn</Text>
@@ -506,23 +488,54 @@ const RedeemScreen = ({ navigation }) => {
         visible={showConfirm}
         onClose={() => {
           setShowConfirm(false);
-          setSnapshotForConfirm(null);
-          setSnapshotError(null);
         }}
         onConfirm={handleConfirmBurn}
         transactionDetails={transactionDetails}
         loading={loading}
-        snapshotCard={
-          snapshotForConfirm ? (
-            <OracleSnapshotCard
-              snapshot={snapshotForConfirm}
-              allowedWindowMinutes={
-                ORACLE_SNAPSHOT_CONFIG.allowedWindowMinutes
-              }
-            />
-          ) : null
-        }
       />
+
+      {/* PIN Verification Modal */}
+      {showPINPrompt && (
+        <View style={styles.pinModalOverlay}>
+          <View style={styles.pinModal}>
+            <Text style={styles.pinModalTitle}>Enter PIN</Text>
+            <Text style={styles.pinModalSubtitle}>Enter your PIN to confirm this transaction</Text>
+            <TextInput
+              style={styles.pinModalInput}
+              value={pinInput}
+              onChangeText={setPinInput}
+              placeholder="Enter PIN"
+              keyboardType="numeric"
+              secureTextEntry
+              autoFocus
+              maxLength={10}
+            />
+            <View style={styles.pinModalButtons}>
+              <TouchableOpacity
+                style={[styles.pinModalButton, styles.pinModalButtonCancel]}
+                onPress={() => {
+                  setShowPINPrompt(false);
+                  setPinInput("");
+                  setShowConfirm(true);
+                }}
+              >
+                <Text style={styles.pinModalButtonCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.pinModalButton,
+                  styles.pinModalButtonConfirm,
+                  (!pinInput || pinInput.length < 4) && styles.buttonDisabled,
+                ]}
+                onPress={handlePINSubmit}
+                disabled={!pinInput || pinInput.length < 4}
+              >
+                <Text style={styles.pinModalButtonConfirmText}>Confirm</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -538,8 +551,10 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.background,
   },
   content: {
+    height:"100vh",
+    overflow:"auto",
     padding: theme.spacing.lg,
-    gap: theme.spacing.lg,
+    paddingBottom: theme.spacing.xl * 2,
   },
   card: {
     backgroundColor: theme.colors.surface,
@@ -587,11 +602,6 @@ const styles = StyleSheet.create({
   },
   modeBannerText: {
     fontSize: 14,
-    color: theme.colors.textSecondary,
-  },
-  snapshotText: {
-    marginTop: theme.spacing.xs,
-    fontSize: 12,
     color: theme.colors.textSecondary,
   },
   form: {
@@ -671,6 +681,80 @@ const styles = StyleSheet.create({
   },
   secondaryButtonText: {
     color: GOLD_COLORS.primary,
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  pinModalOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0, 0, 0, 0.7)",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 10000,
+  },
+  pinModal: {
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.borderRadius.lg,
+    padding: theme.spacing.xl,
+    width: "85%",
+    maxWidth: 400,
+    borderWidth: 2,
+    borderColor: GOLD_COLORS.primary,
+    ...theme.shadows.large,
+  },
+  pinModalTitle: {
+    fontSize: 24,
+    fontWeight: "700",
+    color: theme.colors.text,
+    marginBottom: theme.spacing.sm,
+    textAlign: "center",
+  },
+  pinModalSubtitle: {
+    fontSize: 14,
+    color: theme.colors.textSecondary,
+    marginBottom: theme.spacing.lg,
+    textAlign: "center",
+  },
+  pinModalInput: {
+    backgroundColor: theme.colors.background,
+    borderRadius: theme.borderRadius.md,
+    padding: theme.spacing.md,
+    fontSize: 18,
+    fontWeight: "600",
+    color: theme.colors.text,
+    borderWidth: 2,
+    borderColor: GOLD_COLORS.light,
+    marginBottom: theme.spacing.lg,
+    textAlign: "center",
+  },
+  pinModalButtons: {
+    flexDirection: "row",
+    gap: theme.spacing.md,
+  },
+  pinModalButton: {
+    flex: 1,
+    paddingVertical: theme.spacing.md,
+    borderRadius: theme.borderRadius.md,
+    alignItems: "center",
+  },
+  pinModalButtonCancel: {
+    backgroundColor: theme.colors.surfaceAlt,
+    borderWidth: 1.5,
+    borderColor: theme.colors.border,
+  },
+  pinModalButtonCancelText: {
+    color: theme.colors.text,
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  pinModalButtonConfirm: {
+    backgroundColor: GOLD_COLORS.primary,
+  },
+  pinModalButtonConfirmText: {
+    color: theme.colors.secondary,
     fontSize: 16,
     fontWeight: "600",
   },

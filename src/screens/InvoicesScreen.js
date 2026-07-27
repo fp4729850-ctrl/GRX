@@ -30,6 +30,14 @@ const GOLD_COLORS = {
 
 const getExplorerUrl = (networkKey, isTestnet, txHash) => {
   if (!txHash) return null;
+  
+  // Handle GRX chain - use custom explorer
+  if (networkKey === "GRX" || networkKey === "grx" || !networkKey) {
+    // Use the custom GRX explorer URL
+    return `http://127.0.0.1:5500/frontend/explorer.html?tx=${txHash}`;
+  }
+  
+  // Handle Ethereum and BSC
   const isEthereum = networkKey === "ETHEREUM";
   const network = isEthereum
     ? isTestnet
@@ -38,6 +46,11 @@ const getExplorerUrl = (networkKey, isTestnet, txHash) => {
     : isTestnet
     ? NETWORKS.BSC_TESTNET
     : NETWORKS.BSC_MAINNET;
+  
+  if (!network || !network.explorer) {
+    return null;
+  }
+  
   return `${network.explorer}/tx/${txHash}`;
 };
 
@@ -370,6 +383,8 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.background,
   },
   content: {
+    height:"100vh",
+    overflow:"auto",
     padding: theme.spacing.lg,
     gap: theme.spacing.md,
   },

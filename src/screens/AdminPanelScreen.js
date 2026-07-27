@@ -33,7 +33,7 @@ import AdminSystem from './admin/AdminSystem';
 
 const SIDEBAR_SECTIONS = [
   { id: 'dashboard', label: 'Dashboard', icon: 'dashboard' },
-  { id: 'users', label: 'Users', icon: 'people' },
+  { id: 'users', label: 'Wallet Mapping', icon: 'people' },
   { id: 'transactions', label: 'Transactions', icon: 'swap-horiz' },
   { id: 'invoices', label: 'Invoices', icon: 'receipt-long' },
   { id: 'oracle', label: 'Oracle', icon: 'insights' },

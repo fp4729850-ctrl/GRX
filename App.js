@@ -10,9 +10,10 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
-import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaProvider, SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WalletProvider, useWallet } from './src/context/WalletContext';
 import { getWalletAddress, getAppLocked, setAppLocked } from './src/services/storageService';
+import { isPINVerificationValid, isPINSet } from './src/services/pinService';
 import { theme } from './src/styles/theme';
 
 // Gold color constants
@@ -63,6 +64,7 @@ const MainTabs = () => {
     <Tab.Navigator
       screenOptions={({ route }) => ({
         headerShown: false,
+        
         tabBarHideOnKeyboard: !isWeb,
         tabBarActiveTintColor: GOLD_COLORS.primary,
         tabBarInactiveTintColor: theme.colors.textSecondary,
@@ -83,9 +85,9 @@ const MainTabs = () => {
           borderTopWidth: 2,
           borderTopColor: GOLD_COLORS.primary,
           marginHorizontal: 8,
-          marginBottom: 0,
+          // marginBottom: 20,
           borderRadius: 20,
-          height: 65 + (Platform.OS === 'android' ? insets.bottom : 0),
+          height: 75 + (Platform.OS === 'android' ? insets.bottom : 0),
           paddingBottom: Platform.OS === 'ios' ? insets.bottom + 4 : insets.bottom + 8,
           paddingTop: 12,
           shadowColor: '#000',
@@ -149,6 +151,21 @@ const RootNavigator = () => {
     try {
       const address = await getWalletAddress();
       const locked = await getAppLocked();
+      
+      // Check if PIN is set and verification is still valid (12 hours)
+      if (address) {
+        const pinSet = await isPINSet();
+        if (pinSet) {
+          const pinValid = await isPINVerificationValid();
+          // If PIN is set but verification expired, require PIN entry
+          if (!pinValid) {
+            setIsLocked(true);
+            setIsLoading(false);
+            return;
+          }
+        }
+      }
+      
       setIsLocked(locked && !!address);
       setIsLoading(false);
     } catch (error) {
@@ -176,20 +193,30 @@ const RootNavigator = () => {
   const handleUnlock = async () => {
     await setAppLocked(false);
     setIsLocked(false);
+    // PIN verification timestamp is stored by UnlockScreen when PIN is verified
   };
 
   if (isLoading) {
-    return null; // You can add a loading screen here
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }}>
+        {/* Loading screen can be added here */}
+      </SafeAreaView>
+    );
   }
 
   if (isLocked && isWalletInitialized) {
-    return <UnlockScreen onUnlock={handleUnlock} />;
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }}>
+        <UnlockScreen onUnlock={handleUnlock} />
+      </SafeAreaView>
+    );
   }
 
   return (
-    <NavigationContainer>
-      <Stack.Navigator
-        screenOptions={{
+    <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }}>
+      <NavigationContainer>
+        <Stack.Navigator
+          screenOptions={{
           headerStyle: {
             backgroundColor: GOLD_COLORS.primary,
             borderBottomWidth: 2,
@@ -291,7 +318,8 @@ const RootNavigator = () => {
           </>
         )}
       </Stack.Navigator>
-    </NavigationContainer>
+      </NavigationContainer>
+    </SafeAreaView>
   );
 };
 

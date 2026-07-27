@@ -11,7 +11,8 @@ import {
 } from 'react-native';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import * as LocalAuthentication from 'expo-local-authentication';
-import { getPINHash, getBiometricEnabled } from '../services/storageService';
+import { getBiometricEnabled } from '../services/storageService';
+import { verifyPIN, isPINSet, storePINVerifiedTimestamp } from '../services/pinService';
 import { theme } from '../styles/theme';
 
 // Gold color constants
@@ -37,9 +38,9 @@ const UnlockScreen = ({ onUnlock }) => {
 
   const checkPINExists = async () => {
     try {
-      const pinHash = await getPINHash();
+      const pinSet = await isPINSet();
       // If PIN is not set up, directly unlock (no PIN required)
-      if (!pinHash) {
+      if (!pinSet) {
         console.log('No PIN set up, unlocking directly');
         onUnlock();
         return;
@@ -81,6 +82,8 @@ const UnlockScreen = ({ onUnlock }) => {
       });
 
       if (result.success) {
+        // Store PIN verification timestamp for biometric unlock
+        await storePINVerifiedTimestamp();
         onUnlock();
       }
     } catch (error) {
@@ -89,39 +92,42 @@ const UnlockScreen = ({ onUnlock }) => {
   };
 
   const handlePINSubmit = async () => {
-    if (pin.length !== 6) {
-      Alert.alert('Error', 'Please enter 6-digit PIN');
+    if (pin.length < 4) {
+      Alert.alert('Error', 'Please enter at least 4-digit PIN');
       return;
     }
 
     try {
-      const storedPIN = await getPINHash();
+      const pinSet = await isPINSet();
       // If PIN is not set up, directly unlock
-      if (!storedPIN) {
+      if (!pinSet) {
         onUnlock();
         return;
       }
       
-      if (pin === storedPIN) {
+      const result = await verifyPIN(pin);
+      if (result.success) {
         setPin('');
         onUnlock();
       } else {
-        Alert.alert('Error', 'Invalid PIN');
+        Alert.alert('Error', result.error || 'Invalid PIN');
         setPin('');
         pinInputRef.current?.focus();
       }
     } catch (error) {
       console.error('Error verifying PIN:', error);
-      // If error, unlock anyway to avoid blocking user
-      onUnlock();
+      Alert.alert('Error', 'PIN verification failed');
+      setPin('');
+      pinInputRef.current?.focus();
     }
   };
 
   const handlePINEnter = (value) => {
     if (value.length <= 6) {
       setPin(value);
-      if (value.length === 6) {
-        handlePINSubmit();
+      if (value.length >= 4) {
+        // Auto-submit after 4 digits (minimum PIN length)
+        setTimeout(() => handlePINSubmit(), 100);
       }
     }
   };
@@ -139,25 +145,43 @@ const UnlockScreen = ({ onUnlock }) => {
         <Text style={styles.subtitle}>Enter PIN to unlock</Text>
 
         <View style={styles.pinContainer}>
-          <TextInput
-            ref={pinInputRef}
-            style={styles.pinInput}
-            value={pin}
-            onChangeText={handlePINEnter}
-            keyboardType="numeric"
-            secureTextEntry
-            maxLength={6}
-            autoFocus
-            showSoftInputOnFocus={false}
-          />
-          <View style={styles.pinDots}>
-            {[0, 1, 2, 3, 4, 5].map((index) => (
-              <View
-                key={index}
-                style={[styles.dot, pin.length > index && styles.dotFilled]}
+          {isWeb ? (
+            <TextInput
+              ref={pinInputRef}
+              style={styles.pinInputWeb}
+              value={pin}
+              onChangeText={handlePINEnter}
+              keyboardType="numeric"
+              secureTextEntry
+              maxLength={10}
+              autoFocus
+              showSoftInputOnFocus={true}
+              placeholder="Enter PIN"
+              placeholderTextColor={theme.colors.textSecondary}
+            />
+          ) : (
+            <>
+              <TextInput
+                ref={pinInputRef}
+                style={styles.pinInput}
+                value={pin}
+                onChangeText={handlePINEnter}
+                keyboardType="numeric"
+                secureTextEntry
+                maxLength={10}
+                autoFocus
+                showSoftInputOnFocus={false}
               />
-            ))}
-          </View>
+              <View style={styles.pinDots}>
+                {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map((index) => (
+                  <View
+                    key={index}
+                    style={[styles.dot, pin.length > index && styles.dotFilled]}
+                  />
+                ))}
+              </View>
+            </>
+          )}
         </View>
 
         {biometricAvailable && (
@@ -217,6 +241,24 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 60,
     opacity: 0,
+  },
+  pinInputWeb: {
+    width: '100%',
+    maxWidth: 300,
+    height: 50,
+    borderWidth: 2,
+    borderColor: GOLD_COLORS.primary,
+    borderRadius: theme.borderRadius.md,
+    backgroundColor: theme.colors.background,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+    fontSize: 18,
+    color: theme.colors.text,
+    textAlign: 'center',
+    letterSpacing: 8,
+    outline: 'none',
+    WebkitAppearance: 'none',
+    MozAppearance: 'textfield',
   },
   pinDots: {
     flexDirection: 'row',

@@ -9,6 +9,7 @@ import {
   Alert,
   ActivityIndicator,
   Platform,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
@@ -45,6 +46,8 @@ import { convertGrxToFiat, COUNTRY_OPTIONS, convertFiatBetweenCurrencies } from 
 import { ORACLE_SNAPSHOT_CONFIG } from '../utils/constants';
 import { fetchPayoutStatus } from '../services/partnerService';
 
+const isWeb = Platform.OS === 'web';
+
 const SendScreen = ({ navigation }) => {
   const USD_FEE_PERCENT = 0.01;
   const USD_PRECISION = 6;
@@ -79,6 +82,7 @@ const SendScreen = ({ navigation }) => {
   const [payoutLoading, setPayoutLoading] = useState(false);
   const [payoutError, setPayoutError] = useState(null);
   const payoutPollRef = useRef(null);
+  const [scanningQR, setScanningQR] = useState(false);
   
   // Get GRX balance
   const {
@@ -487,6 +491,152 @@ const SendScreen = ({ navigation }) => {
     }
   };
 
+  const handleScanQR = () => {
+    if (isWeb) {
+      // For web, create input element dynamically
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/*';
+      input.style.display = 'none';
+      input.onchange = (e) => {
+        handleQRFileSelect(e);
+        // Clean up
+        setTimeout(() => {
+          if (input.parentNode) {
+            input.parentNode.removeChild(input);
+          }
+        }, 100);
+      };
+      document.body.appendChild(input);
+      input.click();
+    } else {
+      // For mobile, use expo-image-picker
+      handleMobileQRScan();
+    }
+  };
+
+  const handleMobileQRScan = async () => {
+    try {
+      // Check if expo-image-picker is available
+      const ImagePicker = require('expo-image-picker');
+      
+      // Request permissions
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission Required', 'Camera roll permission is required to scan QR codes');
+        return;
+      }
+
+      // Launch image picker
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: false,
+        quality: 1,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        await decodeQRFromImage(result.assets[0].uri);
+      }
+    } catch (error) {
+      // If expo-image-picker is not installed, show instructions
+      if (error.code === 'MODULE_NOT_FOUND') {
+        Alert.alert(
+          'QR Scanner Not Available',
+          'Please install expo-image-picker to use QR scanning on mobile:\n\nnpm install expo-image-picker'
+        );
+      } else {
+        console.error('QR scan error:', error);
+        Alert.alert('Error', 'Failed to scan QR code: ' + error.message);
+      }
+    }
+  };
+
+  const handleQRFileSelect = async (event) => {
+    const file = event.target?.files?.[0];
+    if (!file) {
+      setScanningQR(false);
+      return;
+    }
+
+    setScanningQR(true);
+    try {
+      const imageUrl = URL.createObjectURL(file);
+      await decodeQRFromImage(imageUrl);
+      URL.revokeObjectURL(imageUrl);
+    } catch (error) {
+      console.error('QR scan error:', error);
+      Alert.alert('Error', 'Failed to scan QR code: ' + error.message);
+    } finally {
+      setScanningQR(false);
+    }
+  };
+
+  const decodeQRFromImage = async (imageUri) => {
+    try {
+      // For web, use jsQR library
+      if (isWeb) {
+        // Load jsQR from CDN if not available
+        if (typeof window !== 'undefined' && !window.jsQR) {
+          const script = document.createElement('script');
+          script.src = 'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js';
+          script.onload = () => processQRImage(imageUri);
+          document.head.appendChild(script);
+          return;
+        }
+        await processQRImage(imageUri);
+      } else {
+        // For mobile, we need a QR decoder library
+        // For now, show a message to manually enter address
+        Alert.alert(
+          'QR Scanning',
+          'Mobile QR scanning requires additional setup. Please enter the address manually or use the web version.'
+        );
+      }
+    } catch (error) {
+      console.error('QR decode error:', error);
+      throw error;
+    }
+  };
+
+  const processQRImage = async (imageUri) => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        ctx.drawImage(img, 0, 0);
+
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        
+        // Use jsQR to decode
+        if (window.jsQR) {
+          const code = window.jsQR(imageData.data, imageData.width, imageData.height);
+          if (code && code.data) {
+            const scannedAddress = code.data.trim();
+            // Validate GRX address format (starts with grx)
+            if (scannedAddress.startsWith('grx')) {
+              setRecipient(scannedAddress);
+              Alert.alert('Success', 'QR code scanned successfully!');
+              resolve(scannedAddress);
+            } else {
+              Alert.alert('Invalid Address', 'The QR code does not contain a valid GRX address (must start with "grx")');
+              reject(new Error('Invalid address format'));
+            }
+          } else {
+            Alert.alert('No QR Code Found', 'Could not find a QR code in the image. Please try another image.');
+            reject(new Error('No QR code found'));
+          }
+        } else {
+          reject(new Error('jsQR library not loaded'));
+        }
+      };
+      img.onerror = () => reject(new Error('Failed to load image'));
+      img.src = imageUri;
+    });
+  };
+
   const handleConfirmTransaction = async () => {
     setLoading(true);
     setShowConfirm(false);
@@ -629,12 +779,22 @@ const SendScreen = ({ navigation }) => {
         </View>
 
         <View style={styles.inputGroup}>
-          <Text style={styles.label}>Recipient Address</Text>
+          <View style={styles.recipientHeader}>
+            <Text style={styles.label}>Recipient Address</Text>
+            <TouchableOpacity
+              style={styles.scanQRButton}
+              onPress={handleScanQR}
+              disabled={scanningQR}
+            >
+              <Ionicons name="qr-code-outline" size={20} color={GOLD_COLORS.primary} />
+              <Text style={styles.scanQRButtonText}>{scanningQR ? 'Scanning...' : 'Scan QR'}</Text>
+            </TouchableOpacity>
+          </View>
           <TextInput
             style={styles.input}
             value={recipient}
             onChangeText={setRecipient}
-            placeholder="0x..."
+            placeholder="grx1... or scan QR code"
             autoCapitalize="none"
           />
         </View>
@@ -969,6 +1129,28 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: theme.colors.text,
     marginBottom: theme.spacing.sm,
+  },
+  recipientHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: theme.spacing.sm,
+  },
+  scanQRButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.xs,
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: theme.spacing.xs,
+    backgroundColor: GOLD_COLORS.light,
+    borderRadius: theme.borderRadius.md,
+    borderWidth: 1.5,
+    borderColor: GOLD_COLORS.primary,
+  },
+  scanQRButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: GOLD_COLORS.dark,
   },
   tokenSelector: {
     flexDirection: 'row',

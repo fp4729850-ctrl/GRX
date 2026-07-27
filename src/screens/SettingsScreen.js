@@ -10,6 +10,8 @@ import {
   ActivityIndicator,
   Clipboard,
   Platform,
+  TextInput,
+  Modal,
 } from 'react-native';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import * as LocalAuthentication from 'expo-local-authentication';
@@ -25,11 +27,11 @@ const GOLD_COLORS = {
 };
 import {
   getMnemonic,
-  getPINHash,
   getBiometricEnabled,
   setBiometricEnabled,
   clearAllData,
 } from '../services/storageService';
+import { isPINSet, setPIN, verifyPIN } from '../services/pinService';
 import { theme } from '../styles/theme';
 
 const isWeb = Platform.OS === 'web';
@@ -47,6 +49,12 @@ const SettingsScreen = ({ navigation }) => {
   const isAdmin = isAdminAddress(walletAddress);
   const [biometricEnabled, setBiometricEnabledState] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [pinSet, setPinSet] = useState(false);
+  const [showPINModal, setShowPINModal] = useState(false);
+  const [showVerifyPINModal, setShowVerifyPINModal] = useState(false);
+  const [newPIN, setNewPIN] = useState('');
+  const [currentPIN, setCurrentPIN] = useState('');
+  const [isChangingPIN, setIsChangingPIN] = useState(false);
 
   useEffect(() => {
     loadSettings();
@@ -55,6 +63,65 @@ const SettingsScreen = ({ navigation }) => {
   const loadSettings = async () => {
     const enabled = await getBiometricEnabled();
     setBiometricEnabledState(enabled);
+    const pinExists = await isPINSet();
+    setPinSet(pinExists);
+  };
+
+  const handleSetupPIN = async () => {
+    setIsChangingPIN(pinSet);
+    setNewPIN('');
+    setCurrentPIN('');
+    setShowPINModal(true);
+  };
+
+  const handleNewPINSubmit = async () => {
+    if (!newPIN || newPIN.length < 4) {
+      Alert.alert('Error', 'PIN must be at least 4 digits');
+      return;
+    }
+
+    if (isChangingPIN) {
+      // Need to verify current PIN first
+      setShowPINModal(false);
+      setShowVerifyPINModal(true);
+    } else {
+      // Setting PIN for first time
+      const setResult = await setPIN(newPIN);
+      if (setResult.success) {
+        Alert.alert('Success', 'PIN setup successfully');
+        setPinSet(true);
+        setShowPINModal(false);
+        setNewPIN('');
+      } else {
+        Alert.alert('Error', setResult.error || 'Failed to setup PIN');
+      }
+    }
+  };
+
+  const handleVerifyCurrentPIN = async () => {
+    if (!currentPIN || currentPIN.length < 4) {
+      Alert.alert('Error', 'Please enter your current PIN');
+      return;
+    }
+
+    const result = await verifyPIN(currentPIN);
+    if (!result.success) {
+      Alert.alert('Error', result.error || 'Invalid PIN');
+      setCurrentPIN('');
+      return;
+    }
+
+    // Old PIN verified, set new PIN
+    const setResult = await setPIN(newPIN);
+    if (setResult.success) {
+      Alert.alert('Success', 'PIN updated successfully');
+      setPinSet(true);
+      setShowVerifyPINModal(false);
+      setNewPIN('');
+      setCurrentPIN('');
+    } else {
+      Alert.alert('Error', setResult.error || 'Failed to update PIN');
+    }
   };
 
   const handleExportMnemonic = async () => {
@@ -84,20 +151,10 @@ const SettingsScreen = ({ navigation }) => {
               }
               
               // Fallback to PIN (or use PIN on web)
-              Alert.prompt('Enter PIN', 'Enter your PIN to continue', [
-                { text: 'Cancel', style: 'cancel' },
-                {
-                  text: 'OK',
-                  onPress: async (pin) => {
-                    const storedPIN = await getPINHash();
-                    if (pin !== storedPIN) {
-                      Alert.alert('Error', 'Invalid PIN');
-                      return;
-                    }
-                    showMnemonic();
-                  },
-                },
-              ]);
+              // Show PIN modal for verification
+              setShowVerifyPINModal(true);
+              setCurrentPIN('');
+              return;
             } catch (error) {
               Alert.alert('Error', 'Authentication failed');
             }
@@ -284,6 +341,25 @@ const SettingsScreen = ({ navigation }) => {
         </View>
         <TouchableOpacity
           style={styles.settingRow}
+          onPress={handleSetupPIN}
+        >
+          <View style={styles.settingColumn}>
+            <View style={styles.settingLabelRow}>
+              <MaterialIcons name="lock" size={18} color={theme.colors.text} />
+              <Text style={styles.settingLabel}>
+                {pinSet ? ' Change PIN' : ' Setup PIN'}
+              </Text>
+            </View>
+            <Text style={styles.settingDescription}>
+              {pinSet
+                ? 'Change your PIN for transaction confirmations'
+                : 'Set up PIN for transaction confirmations and app security'}
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color={theme.colors.textSecondary} />
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.settingRow}
           onPress={handleExportMnemonic}
         >
           <View style={styles.settingLabelRow}>
@@ -330,6 +406,153 @@ const SettingsScreen = ({ navigation }) => {
           )}
         </TouchableOpacity>
       </View>
+
+      {/* PIN Setup/Change Modal */}
+      <Modal
+        visible={showPINModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          setShowPINModal(false);
+          setNewPIN('');
+        }}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modal}>
+            <Text style={styles.modalTitle}>
+              {isChangingPIN ? 'Change PIN' : 'Setup PIN'}
+            </Text>
+            <Text style={styles.modalSubtitle}>
+              Enter a PIN (minimum 4 digits)
+            </Text>
+            <TextInput
+              style={styles.modalInput}
+              value={newPIN}
+              onChangeText={setNewPIN}
+              placeholder="Enter new PIN"
+              keyboardType="numeric"
+              secureTextEntry
+              autoFocus
+              maxLength={10}
+            />
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalButtonCancel]}
+                onPress={() => {
+                  setShowPINModal(false);
+                  setNewPIN('');
+                }}
+              >
+                <Text style={styles.modalButtonCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.modalButton,
+                  styles.modalButtonConfirm,
+                  (!newPIN || newPIN.length < 4) && styles.modalButtonDisabled,
+                ]}
+                onPress={handleNewPINSubmit}
+                disabled={!newPIN || newPIN.length < 4}
+              >
+                <Text style={styles.modalButtonConfirmText}>Continue</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* PIN Verification Modal */}
+      <Modal
+        visible={showVerifyPINModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          setShowVerifyPINModal(false);
+          setCurrentPIN('');
+          if (isChangingPIN) {
+            setShowPINModal(true);
+          }
+        }}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modal}>
+            <Text style={styles.modalTitle}>
+              {isChangingPIN ? 'Verify Current PIN' : 'Enter PIN'}
+            </Text>
+            <Text style={styles.modalSubtitle}>
+              {isChangingPIN
+                ? 'Enter your current PIN to continue'
+                : 'Enter your PIN to export recovery phrase'}
+            </Text>
+            <TextInput
+              style={styles.modalInput}
+              value={currentPIN}
+              onChangeText={setCurrentPIN}
+              placeholder="Enter PIN"
+              keyboardType="numeric"
+              secureTextEntry
+              autoFocus
+              maxLength={10}
+              onSubmitEditing={
+                isChangingPIN
+                  ? handleVerifyCurrentPIN
+                  : async () => {
+                      const result = await verifyPIN(currentPIN);
+                      if (!result.success) {
+                        Alert.alert('Error', result.error || 'Invalid PIN');
+                        setCurrentPIN('');
+                        return;
+                      }
+                      setShowVerifyPINModal(false);
+                      setCurrentPIN('');
+                      showMnemonic();
+                    }
+              }
+            />
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalButtonCancel]}
+                onPress={() => {
+                  setShowVerifyPINModal(false);
+                  setCurrentPIN('');
+                  if (isChangingPIN) {
+                    setShowPINModal(true);
+                  }
+                }}
+              >
+                <Text style={styles.modalButtonCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.modalButton,
+                  styles.modalButtonConfirm,
+                  (!currentPIN || currentPIN.length < 4) && styles.modalButtonDisabled,
+                ]}
+                onPress={
+                  isChangingPIN
+                    ? handleVerifyCurrentPIN
+                    : async () => {
+                        const result = await verifyPIN(currentPIN);
+                        if (!result.success) {
+                          Alert.alert('Error', result.error || 'Invalid PIN');
+                          setCurrentPIN('');
+                          return;
+                        }
+                        setShowVerifyPINModal(false);
+                        setCurrentPIN('');
+                        showMnemonic();
+                      }
+                }
+                disabled={!currentPIN || currentPIN.length < 4}
+              >
+                <Text style={styles.modalButtonConfirmText}>
+                  {isChangingPIN ? 'Verify' : 'OK'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 };
@@ -392,6 +615,78 @@ const styles = StyleSheet.create({
   },
   dangerText: {
     color: theme.colors.error,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modal: {
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.borderRadius.lg,
+    padding: theme.spacing.xl,
+    width: '85%',
+    maxWidth: 400,
+    borderWidth: 2,
+    borderColor: GOLD_COLORS.primary,
+    ...theme.shadows.large,
+  },
+  modalTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: theme.colors.text,
+    marginBottom: theme.spacing.sm,
+    textAlign: 'center',
+  },
+  modalSubtitle: {
+    fontSize: 14,
+    color: theme.colors.textSecondary,
+    marginBottom: theme.spacing.lg,
+    textAlign: 'center',
+  },
+  modalInput: {
+    backgroundColor: theme.colors.background,
+    borderRadius: theme.borderRadius.md,
+    padding: theme.spacing.md,
+    fontSize: 18,
+    fontWeight: '600',
+    color: theme.colors.text,
+    borderWidth: 2,
+    borderColor: GOLD_COLORS.light,
+    marginBottom: theme.spacing.lg,
+    textAlign: 'center',
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    gap: theme.spacing.md,
+  },
+  modalButton: {
+    flex: 1,
+    paddingVertical: theme.spacing.md,
+    borderRadius: theme.borderRadius.md,
+    alignItems: 'center',
+  },
+  modalButtonCancel: {
+    backgroundColor: theme.colors.surfaceAlt,
+    borderWidth: 1.5,
+    borderColor: theme.colors.border,
+  },
+  modalButtonCancelText: {
+    color: theme.colors.text,
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  modalButtonConfirm: {
+    backgroundColor: GOLD_COLORS.primary,
+  },
+  modalButtonConfirmText: {
+    color: theme.colors.secondary,
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  modalButtonDisabled: {
+    opacity: 0.5,
   },
 });
 
