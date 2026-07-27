@@ -2,10 +2,10 @@
 export const GRX_CHAIN_CONFIG = {
   RPC_URL:
     (typeof process !== 'undefined' && process.env?.EXPO_PUBLIC_GRX_RPC_URL) ||
-    'https://187.127.186.10.nip.io/rpc',
+    'https://rpc.grxglobal.in',
   REST_URL:
     (typeof process !== 'undefined' && process.env?.EXPO_PUBLIC_GRX_REST_URL) ||
-    'https://187.127.186.10.nip.io/api',
+    'https://api.grxglobal.in',
   PREFIX: 'grx',
 };
 
@@ -89,7 +89,7 @@ export const NETWORKS = {
     name: 'GRX Chain',
     chainId: 'grx-1',
     rpcUrl: GRX_CHAIN_CONFIG.RPC_URL,
-    explorer: GRX_CHAIN_CONFIG.REST_URL.replace('/api', '') || 'https://187.127.186.10.nip.io/api',
+    explorer: GRX_CHAIN_CONFIG.REST_URL || 'https://api.grxglobal.in',
     symbol: 'GRX',
   },
 };
