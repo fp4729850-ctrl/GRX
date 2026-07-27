@@ -1,7 +1,6 @@
 // Admin wallet addresses
 export const ADMIN_ADDRESSES = [
-  '0x86fa132685b2f22d17AB0c37e00F9Bc9d13Ef69f',
-  '0xE6B5636C49EA21aEf6A60F24b2371b3448509cb8',
+  'grx1cf97hmg0kgpclr6l384d3u7qth3klxlar0h3xr',
 ];
 
 /**
