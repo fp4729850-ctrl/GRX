@@ -7,6 +7,8 @@ import { useWallet } from "../context/WalletContext";
 import { useGRXBalance } from "../hooks/useGRXBalance";
 import { createMintTransaction } from "../services/grxChainService";
 import { getMnemonic } from "../services/storageService";
+import { getMintTransactions, saveMintTransaction } from "../services/mintTransactionService";
+import { Linking } from "react-native";
 
 // Gold color constants
 const GOLD_COLORS = {
@@ -40,8 +42,23 @@ const MintScreen = () => {
   const [isMinting, setIsMinting] = useState(false);
   const [mintError, setMintError] = useState(null);
   const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
+  const [mintTransactions, setMintTransactions] = useState([]);
   const refreshIntervalRef = useRef(null);
   const appState = useRef(AppState.currentState);
+
+  // Load mint transactions on mount
+  useEffect(() => {
+    loadMintTransactions();
+  }, []);
+
+  const loadMintTransactions = async () => {
+    try {
+      const transactions = await getMintTransactions();
+      setMintTransactions(transactions);
+    } catch (error) {
+      console.error('Failed to load mint transactions:', error);
+    }
+  };
 
   // Auto-refresh balance every 5 seconds when screen is active
   useEffect(() => {
@@ -79,13 +96,22 @@ const MintScreen = () => {
     };
   }, [walletAddress, autoRefreshEnabled, refreshBalance, refreshBalances]);
 
-  const calculateGRX = (usdAmount) => {
-    if (!usdAmount || parseFloat(usdAmount) <= 0) {
-      setEstimatedGRX("0");
+  const [estimatedGold, setEstimatedGold] = useState({ grams: "0.0000", kg: "0.0000", oz: "0.00" });
+
+  const calculateGold = (grxAmount) => {
+    if (!grxAmount || parseFloat(grxAmount) <= 0) {
+      setEstimatedGold({ grams: "0.0000", kg: "0.0000", oz: "0.00" });
       return;
     }
-    const grx = (parseFloat(usdAmount) / DUMMY_MINT_DATA.goldPricePerGram).toFixed(4);
-    setEstimatedGRX(grx);
+    const grams = parseFloat(grxAmount);
+    const kg = grams / 1000;
+    const oz = grams / 31.1034768;
+
+    setEstimatedGold({
+      grams: grams.toFixed(4),
+      kg: kg.toFixed(4),
+      oz: oz.toFixed(2)
+    });
   };
 
   const handleMint = async () => {
@@ -114,13 +140,37 @@ const MintScreen = () => {
         throw new Error("Mnemonic not found. Please import or create a wallet.");
       }
 
+      // Convert GRX amount to base units (multiply by 1,000,000 for 6 decimals)
+      // User enters 1 GRX = 1,000,000 base units
+      const amountInBaseUnits = Math.floor(
+        parseFloat(amount) * Math.pow(10, 6) // 6 decimals = 1,000,000
+      );
+
       // Create mint transaction
       const txHash = await createMintTransaction(mnemonic, {
         index,
         country,
         vaultId,
-        amount: parseFloat(amount),
+        amount: amountInBaseUnits, // Pass base units, not GRX
       });
+
+      const mintTransaction = {
+        id: `MINT-${Date.now()}`,
+        txHash,
+        amount,
+        index,
+        country,
+        vaultId,
+        goldGrams: estimatedGold.grams,
+        goldKg: estimatedGold.kg,
+        goldOz: estimatedGold.oz,
+        timestamp: new Date().toISOString(),
+        network: "GRX",
+        isTestnet: false,
+      };
+
+      await saveMintTransaction(mintTransaction);
+      await loadMintTransactions(); // Reload transactions list
 
       Alert.alert(
         "Success",
@@ -139,7 +189,7 @@ const MintScreen = () => {
               setIndex("");
               setCountry("");
               setVaultId("");
-              setEstimatedGRX("0");
+              setEstimatedGold({ grams: "0.0000", kg: "0.0000", oz: "0.00" });
             },
           },
         ]
@@ -272,27 +322,26 @@ const MintScreen = () => {
             value={amount}
             onChangeText={(text) => {
               setAmount(text);
-              calculateGRX(text);
+              calculateGold(text);
             }}
             placeholder="0.00"
             keyboardType="decimal-pad"
           />
-          <Text style={styles.hint}>
-            Min: ${DUMMY_MINT_DATA.minMintAmount} • Max: ${DUMMY_MINT_DATA.maxMintAmount}
-          </Text>
         </View>
 
-        {estimatedGRX !== "0" && (
+        {amount && parseFloat(amount) > 0 && (
           <View style={styles.resultCard}>
             <View style={styles.resultRow}>
-              <Text style={styles.resultLabel}>You will receive:</Text>
-              <Text style={styles.resultValue}>{estimatedGRX} GRX</Text>
+              <Text style={styles.resultLabel}>Gold (grams):</Text>
+              <Text style={styles.resultValue}>{estimatedGold.grams} g</Text>
             </View>
             <View style={styles.resultRow}>
-              <Text style={styles.resultLabel}>Fee:</Text>
-              <Text style={styles.resultValue}>
-                ${(parseFloat(amount) * 0.015).toFixed(2)}
-              </Text>
+              <Text style={styles.resultLabel}>Gold (kg):</Text>
+              <Text style={styles.resultValue}>{estimatedGold.kg} kg</Text>
+            </View>
+            <View style={styles.resultRow}>
+              <Text style={styles.resultLabel}>Gold (troy oz):</Text>
+              <Text style={styles.resultValue}>{estimatedGold.oz} oz</Text>
             </View>
           </View>
         )}
@@ -331,6 +380,63 @@ const MintScreen = () => {
             Minting creates a sovereign vault on the GRX chain. Ensure all fields are correct before submitting.
           </Text>
         </View>
+
+        {/* Mint Transactions History */}
+        {mintTransactions.length > 0 && (
+          <View style={styles.transactionsSection}>
+            <View style={styles.sectionHeader}>
+              <MaterialIcons name="history" size={24} color={GOLD_COLORS.primary} />
+              <Text style={styles.sectionTitle}>Mint History</Text>
+            </View>
+            {mintTransactions.map((transaction, index) => (
+              <View key={transaction.id || index} style={styles.transactionCard}>
+                <View style={styles.transactionHeader}>
+                  <View style={styles.transactionInfo}>
+                    <Text style={styles.transactionId}>{transaction.id}</Text>
+                    <Text style={styles.transactionDate}>
+                      {new Date(transaction.timestamp).toLocaleString()}
+                    </Text>
+                  </View>
+                  <View style={styles.transactionAmount}>
+                    <Text style={styles.transactionAmountText}>
+                      {transaction.amount} GRX
+                    </Text>
+                  </View>
+                </View>
+                <View style={styles.transactionDetails}>
+                  <View style={styles.transactionRow}>
+                    <Text style={styles.transactionLabel}>Vault Index:</Text>
+                    <Text style={styles.transactionValue}>{transaction.index}</Text>
+                  </View>
+                  <View style={styles.transactionRow}>
+                    <Text style={styles.transactionLabel}>Country:</Text>
+                    <Text style={styles.transactionValue}>{transaction.country}</Text>
+                  </View>
+                  <View style={styles.transactionRow}>
+                    <Text style={styles.transactionLabel}>Vault ID:</Text>
+                    <Text style={styles.transactionValue}>{transaction.vaultId}</Text>
+                  </View>
+                  <View style={styles.transactionRow}>
+                    <Text style={styles.transactionLabel}>Gold Weight:</Text>
+                    <Text style={styles.transactionValue}>{transaction.goldGrams} g ({transaction.goldOz} oz)</Text>
+                  </View>
+                </View>
+                {transaction.txHash && (
+                  <TouchableOpacity
+                    style={styles.explorerButton}
+                    onPress={() => {
+                      const explorerUrl = `http://127.0.0.1:5500/frontend/explorer.html?tx=${transaction.txHash}`;
+                      Linking.openURL(explorerUrl);
+                    }}
+                  >
+                    <Ionicons name="open-outline" size={16} color={GOLD_COLORS.primary} />
+                    <Text style={styles.explorerText}>View on Explorer</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            ))}
+          </View>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -347,6 +453,8 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   content: {
+    height: '100vh',
+    overflowY: 'auto',
     padding: theme.spacing.lg,
     paddingBottom: theme.spacing.xl * 2,
     flexGrow: 1,
@@ -572,6 +680,98 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: theme.colors.error,
     fontWeight: "500",
+  },
+  transactionsSection: {
+    marginTop: theme.spacing.xl,
+    paddingTop: theme.spacing.lg,
+    borderTopWidth: 2,
+    borderTopColor: GOLD_COLORS.light,
+  },
+  sectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: theme.spacing.md,
+    gap: theme.spacing.sm,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: GOLD_COLORS.primary,
+  },
+  transactionCard: {
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.borderRadius.lg,
+    padding: theme.spacing.md,
+    marginBottom: theme.spacing.md,
+    borderWidth: 1.5,
+    borderColor: GOLD_COLORS.light,
+    ...theme.shadows.small,
+  },
+  transactionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: theme.spacing.sm,
+    paddingBottom: theme.spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: GOLD_COLORS.light,
+  },
+  transactionInfo: {
+    flex: 1,
+  },
+  transactionId: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: theme.colors.text,
+    marginBottom: theme.spacing.xs / 2,
+  },
+  transactionDate: {
+    fontSize: 12,
+    color: theme.colors.textSecondary,
+  },
+  transactionAmount: {
+    alignItems: "flex-end",
+  },
+  transactionAmountText: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: GOLD_COLORS.primary,
+  },
+  transactionDetails: {
+    marginTop: theme.spacing.sm,
+    gap: theme.spacing.xs,
+  },
+  transactionRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: theme.spacing.xs / 2,
+  },
+  transactionLabel: {
+    fontSize: 12,
+    color: theme.colors.textSecondary,
+    fontWeight: "600",
+  },
+  transactionValue: {
+    fontSize: 12,
+    color: theme.colors.text,
+    fontWeight: "500",
+  },
+  explorerButton: {
+    marginTop: theme.spacing.sm,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    backgroundColor: GOLD_COLORS.light,
+    paddingVertical: theme.spacing.xs,
+    paddingHorizontal: theme.spacing.sm,
+    borderRadius: theme.borderRadius.sm,
+    alignSelf: "flex-end",
+  },
+  explorerText: {
+    color: GOLD_COLORS.dark,
+    fontWeight: "600",
+    fontSize: 12,
+    marginLeft: theme.spacing.xs / 2,
   },
 });
 
