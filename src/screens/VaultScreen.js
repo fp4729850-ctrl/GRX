@@ -164,7 +164,6 @@ const VaultScreen = ({ navigation }) => {
           
           {COUNTRIES.map(vault => {
             const vaultTotal = getColTotal(vault);
-            if (vaultTotal === 0) return null;
 
             return (
               <View key={`breakdown-${vault}`} style={styles.breakdownCard}>
@@ -174,28 +173,32 @@ const VaultScreen = ({ navigation }) => {
                 </View>
                 <View style={styles.divider} />
                 
-                {COUNTRIES.map(owner => {
-                  const amount = getAmount(owner, vault);
-                  if (amount === 0) return null;
-                  
-                  const isDomestic = owner === vault;
-                  const percentage = ((amount / vaultTotal) * 100).toFixed(0);
-                  
-                  return (
-                    <View key={`bd-row-${owner}-${vault}`} style={styles.breakdownRow}>
-                      <View style={styles.breakdownRowHeader}>
-                        <Text style={styles.breakdownOwner}>
-                          {owner} {isDomestic ? <Text style={styles.domesticLabel}>(domestic)</Text> : null}
-                        </Text>
-                        <Text style={styles.breakdownAmount}>{percentage}%</Text>
+                {vaultTotal === 0 ? (
+                  <Text style={styles.emptyVaultText}>No GRX stored in this vault yet.</Text>
+                ) : (
+                  COUNTRIES.map(owner => {
+                    const amount = getAmount(owner, vault);
+                    if (amount === 0) return null;
+                    
+                    const isDomestic = owner === vault;
+                    const percentage = ((amount / vaultTotal) * 100).toFixed(0);
+                    
+                    return (
+                      <View key={`bd-row-${owner}-${vault}`} style={styles.breakdownRow}>
+                        <View style={styles.breakdownRowHeader}>
+                          <Text style={styles.breakdownOwner}>
+                            {owner} {isDomestic ? <Text style={styles.domesticLabel}>(domestic)</Text> : null}
+                          </Text>
+                          <Text style={styles.breakdownAmount}>{percentage}%</Text>
+                        </View>
+                        <Text style={styles.breakdownSubAmount}>{formatNumber(amount)} GRX</Text>
+                        <View style={styles.progressBarBg}>
+                          <View style={[styles.progressBarFill, { width: `${percentage}%`, backgroundColor: isDomestic ? GOLD_COLORS.primary : GOLD_COLORS.dark }]} />
+                        </View>
                       </View>
-                      <Text style={styles.breakdownSubAmount}>{formatNumber(amount)} GRX</Text>
-                      <View style={styles.progressBarBg}>
-                        <View style={[styles.progressBarFill, { width: `${percentage}%`, backgroundColor: isDomestic ? GOLD_COLORS.primary : GOLD_COLORS.dark }]} />
-                      </View>
-                    </View>
-                  );
-                })}
+                    );
+                  })
+                )}
               </View>
             );
           })}
@@ -375,6 +378,13 @@ const styles = StyleSheet.create({
   progressBarFill: {
     height: "100%",
     borderRadius: 3,
+  },
+  emptyVaultText: {
+    fontSize: 14,
+    color: theme.colors.textSecondary,
+    fontStyle: 'italic',
+    textAlign: 'center',
+    paddingVertical: theme.spacing.md,
   },
 });
 
