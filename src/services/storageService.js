@@ -2,6 +2,7 @@ import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { STORAGE_KEYS } from '../utils/constants';
+import { apiClient } from './apiClient';
 
 const isWeb = Platform.OS === 'web';
 
@@ -398,10 +399,8 @@ export const clearAuthToken = async () => {
  */
 export const getWalletMappings = async () => {
   try {
-    const data = isWeb
-      ? await AsyncStorage.getItem(STORAGE_KEYS.WALLET_MAPPINGS)
-      : await SecureStore.getItemAsync(STORAGE_KEYS.WALLET_MAPPINGS);
-    return data ? JSON.parse(data) : [];
+    const data = await apiClient.get('/api/wallet-mappings');
+    return data?.mappings || [];
   } catch (error) {
     console.error('Error getting wallet mappings:', error);
     return [];
@@ -413,24 +412,8 @@ export const getWalletMappings = async () => {
  */
 export const saveWalletMapping = async (country, address) => {
   try {
-    const mappings = await getWalletMappings();
-    
-    // Check if address already exists and update it, else push new mapping
-    const existingIndex = mappings.findIndex(m => m.address.toLowerCase() === address.toLowerCase());
-    
-    if (existingIndex >= 0) {
-      mappings[existingIndex].country = country;
-    } else {
-      mappings.push({ id: Date.now().toString(), country, address });
-    }
-    
-    const stringData = JSON.stringify(mappings);
-    if (isWeb) {
-      await AsyncStorage.setItem(STORAGE_KEYS.WALLET_MAPPINGS, stringData);
-    } else {
-      await SecureStore.setItemAsync(STORAGE_KEYS.WALLET_MAPPINGS, stringData);
-    }
-    return { success: true, mappings };
+    const data = await apiClient.post('/api/wallet-mappings', { country, address });
+    return { success: true, mappings: data?.mappings || [] };
   } catch (error) {
     console.error('Error saving wallet mapping:', error);
     return { success: false, error: 'Failed to save mapping' };
@@ -442,16 +425,8 @@ export const saveWalletMapping = async (country, address) => {
  */
 export const deleteWalletMapping = async (address) => {
   try {
-    const mappings = await getWalletMappings();
-    const updatedMappings = mappings.filter(m => m.address.toLowerCase() !== address.toLowerCase());
-    
-    const stringData = JSON.stringify(updatedMappings);
-    if (isWeb) {
-      await AsyncStorage.setItem(STORAGE_KEYS.WALLET_MAPPINGS, stringData);
-    } else {
-      await SecureStore.setItemAsync(STORAGE_KEYS.WALLET_MAPPINGS, stringData);
-    }
-    return { success: true, mappings: updatedMappings };
+    const data = await apiClient.del(`/api/wallet-mappings/${address}`);
+    return { success: true, mappings: data?.mappings || [] };
   } catch (error) {
     console.error('Error deleting wallet mapping:', error);
     return { success: false, error: 'Failed to delete mapping' };
