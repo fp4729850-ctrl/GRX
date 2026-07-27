@@ -15,6 +15,7 @@ import { SettlementsModule } from './settlements/settlements.module';
 import { PartnersModule } from './partners/partners.module';
 import { AdminModule } from './admin/admin.module';
 import { WalletMappingsModule } from './wallet-mappings/wallet-mappings.module';
+import { ClaimMatrixModule } from './claim-matrix/claim-matrix.module';
 
 @Module({
   imports: [
@@ -42,6 +43,7 @@ import { WalletMappingsModule } from './wallet-mappings/wallet-mappings.module';
     PartnersModule,
     AdminModule,
     WalletMappingsModule,
+    ClaimMatrixModule,
   ],
 })
 export class AppModule {}
