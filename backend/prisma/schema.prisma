@@ -224,6 +224,131 @@ model wallets {
   @@index([userId])
 }
 
+model claim_matrix {
+  id           String   @id
+  ownerVault   String
+  reserveVault String
+  amount       Decimal  @default(0.00000000) @db.Decimal(18, 8)
+  updatedAt    DateTime
+
+  @@unique([ownerVault, reserveVault])
+  @@index([ownerVault])
+  @@index([reserveVault])
+}
+
+model gold_bar_allocations {
+  id               String    @id @db.VarChar(64)
+  barId            String    @db.VarChar(64)
+  walletAddress    String
+  vaultHome        String
+  grams            Decimal   @db.Decimal(18, 8)
+  status           String    @default("ACTIVE") @db.VarChar(32)
+  sourceTxHash     String?
+  transferIntentId String?
+  createdAt        DateTime  @default(now()) @db.DateTime(0)
+  updatedAt        DateTime  @default(now()) @db.DateTime(0)
+  gold_bars        gold_bars @relation(fields: [barId], references: [id], onUpdate: Restrict, map: "gold_bar_allocations_bar_fk")
+
+  @@index([barId], map: "gold_bar_allocations_bar_idx")
+  @@index([status])
+  @@index([walletAddress], map: "gold_bar_allocations_wallet_idx")
+}
+
+model gold_bar_movements {
+  id               String    @id @db.VarChar(64)
+  barId            String    @db.VarChar(64)
+  fromWallet       String
+  toWallet         String
+  grams            Decimal   @db.Decimal(18, 8)
+  txHash           String?
+  transferIntentId String?
+  createdAt        DateTime  @default(now()) @db.DateTime(0)
+  gold_bars        gold_bars @relation(fields: [barId], references: [id], onUpdate: Restrict, map: "gold_bar_movements_bar_fk")
+
+  @@index([barId], map: "gold_bar_movements_bar_idx")
+  @@index([fromWallet], map: "gold_bar_movements_from_idx")
+  @@index([toWallet], map: "gold_bar_movements_to_idx")
+}
+
+model gold_bars {
+  id                   String                 @id @db.VarChar(64)
+  barSerial            String                 @unique(map: "barSerial")
+  vaultId              String
+  vaultHome            String
+  weightGrams          Decimal                @db.Decimal(18, 8)
+  availableGrams       Decimal                @db.Decimal(18, 8)
+  purity               String                 @db.VarChar(32)
+  mintTxHash           String?
+  status               String                 @default("ACTIVE") @db.VarChar(32)
+  createdAt            DateTime               @default(now()) @db.DateTime(0)
+  updatedAt            DateTime               @default(now()) @db.DateTime(0)
+  gold_bar_allocations gold_bar_allocations[]
+  gold_bar_movements   gold_bar_movements[]
+
+  @@index([status])
+  @@index([vaultHome])
+}
+
+model mint_requests {
+  id            String               @id
+  walletAddress String
+  vaultHome     String
+  grams         Decimal              @db.Decimal(18, 8)
+  vaultId       String
+  nonce         String               @unique
+  status        mint_requests_status @default(REQUESTED)
+  authSignature String?              @db.Text
+  txHash        String?
+  blockNumber   BigInt?
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime
+
+  @@index([nonce])
+  @@index([status])
+  @@index([walletAddress])
+}
+
+model transfer_intents {
+  id                 String                  @id
+  sender             String
+  receiver           String
+  senderVault        String
+  receiverVault      String
+  amount             Decimal                 @db.Decimal(18, 8)
+  txHash             String?                 @unique
+  blockNumber        BigInt?
+  status             transfer_intents_status @default(INITIATED)
+  reserveMovement    Decimal?                @db.Decimal(18, 8)
+  liabilityCancelled Decimal?                @db.Decimal(18, 8)
+  failureReason      String?                 @db.Text
+  settledAt          DateTime?
+  createdAt          DateTime                @default(now())
+  updatedAt          DateTime
+
+  @@index([receiver])
+  @@index([sender])
+  @@index([status])
+  @@index([txHash])
+}
+
+model vault_accounts {
+  id                  String                @id
+  walletAddress       String                @unique
+  vaultHome           String
+  claimBalance        Decimal               @default(0.00000000) @db.Decimal(18, 8)
+  pendingIncoming     Decimal               @default(0.00000000) @db.Decimal(18, 8)
+  pendingOutgoing     Decimal               @default(0.00000000) @db.Decimal(18, 8)
+  lockedFlag          Boolean               @default(false)
+  status              vault_accounts_status @default(CREATED)
+  lastSettlementBlock BigInt?
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime
+
+  @@index([status])
+  @@index([vaultHome])
+  @@index([walletAddress])
+}
+
 enum invoices_status {
   RECEIVED
   AWAITING_REDEEM
@@ -282,6 +407,33 @@ enum certificates_status {
   VERIFIED
   MINTED
   REJECTED
+}
+
+enum mint_requests_status {
+  REQUESTED
+  AUTHORIZED
+  USER_SIGNED
+  CHAIN_CONFIRMED
+  RECONCILED
+  FAILED
+}
+
+enum vault_accounts_status {
+  CREATED
+  SYNCING
+  ACTIVE
+  LOCKED
+  FROZEN
+}
+
+enum transfer_intents_status {
+  INITIATED
+  SIGNED
+  BROADCASTED
+  CHAIN_CONFIRMED
+  CLEARING
+  SETTLED
+  FAILED
 }
 
 model wallet_mappings {
