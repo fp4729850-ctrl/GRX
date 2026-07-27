@@ -283,3 +283,14 @@ enum certificates_status {
   MINTED
   REJECTED
 }
+
+model wallet_mappings {
+  id        String   @id @default(cuid())
+  country   String
+  address   String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([country])
+  @@index([address])
+}

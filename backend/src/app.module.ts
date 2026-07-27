@@ -14,6 +14,7 @@ import { OraclesModule } from './oracles/oracles.module';
 import { SettlementsModule } from './settlements/settlements.module';
 import { PartnersModule } from './partners/partners.module';
 import { AdminModule } from './admin/admin.module';
+import { WalletMappingsModule } from './wallet-mappings/wallet-mappings.module';
 
 @Module({
   imports: [
@@ -40,6 +41,7 @@ import { AdminModule } from './admin/admin.module';
     SettlementsModule,
     PartnersModule,
     AdminModule,
+    WalletMappingsModule,
   ],
 })
 export class AppModule {}
