@@ -1,8 +1,9 @@
-import React from "react";
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from "react-native";
+import React, { useState, useEffect } from "react";
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { MaterialIcons, Ionicons } from "@expo/vector-icons";
+import { MaterialIcons } from "@expo/vector-icons";
 import { theme } from "../styles/theme";
+import { claimMatrixService } from "../services/claimMatrixService";
 
 // Gold color constants
 const GOLD_COLORS = {
@@ -10,47 +11,61 @@ const GOLD_COLORS = {
   light: "#F4E4BC",
   dark: "#B8941F",
   accent: "#FFD700",
+  faded: "#F9F2DD",
 };
 
-// Dummy ownership data
-const DUMMY_OWNERSHIP_DATA = {
-  totalOwnership: "1250.5000",
-  totalValueUSD: "94387.75",
-  holdings: [
-    {
-      id: "HOLD-001",
-      amount: "500.2500",
-      valueUSD: "37762.50",
-      status: "Active",
-      purchaseDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toLocaleDateString(),
-    },
-    {
-      id: "HOLD-002",
-      amount: "750.2500",
-      valueUSD: "56625.25",
-      status: "Active",
-      purchaseDate: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toLocaleDateString(),
-    },
-  ],
-  recentTransfers: [
-    {
-      id: "TRF-001",
-      type: "Received",
-      amount: "100.0000",
-      from: "0x1234...5678",
-      date: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toLocaleDateString(),
-    },
-    {
-      id: "TRF-002",
-      type: "Sent",
-      amount: "50.0000",
-      to: "0xabcd...efgh",
-      date: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toLocaleDateString(),
-    },
-  ],
-};
+const COUNTRIES = ["India", "Russia", "UAE"];
 
 const VaultScreen = ({ navigation }) => {
+  const [matrixData, setMatrixData] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    fetchMatrix();
+  }, []);
+
+  const fetchMatrix = async () => {
+    try {
+      setLoading(true);
+      const data = await claimMatrixService.getMatrix();
+      setMatrixData(data);
+    } catch (err) {
+      setError("Failed to fetch matrix data");
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Helper to get amount from matrixData
+  const getAmount = (owner, vault) => {
+    const record = matrixData.find(m => m.ownerVault === owner && m.reserveVault === vault);
+    return record ? parseFloat(record.amount) : 0;
+  };
+
+  const getRowTotal = (owner) => {
+    return COUNTRIES.reduce((sum, vault) => sum + getAmount(owner, vault), 0);
+  };
+
+  const getColTotal = (vault) => {
+    return COUNTRIES.reduce((sum, owner) => sum + getAmount(owner, vault), 0);
+  };
+
+  const formatNumber = (num) => {
+    return num.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 4 });
+  };
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.centerContainer}>
+          <ActivityIndicator size="large" color={GOLD_COLORS.primary} />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView
@@ -59,84 +74,133 @@ const VaultScreen = ({ navigation }) => {
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.header}>
-          <View style={styles.iconContainer}>
-            <MaterialIcons name="account-balance" size={64} color={GOLD_COLORS.primary} />
+          <Text style={styles.title}>Vault</Text>
+        </View>
+
+        {/* Ownership Matrix Card */}
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <MaterialIcons name="grid-on" size={24} color={GOLD_COLORS.dark} />
+            <Text style={styles.cardTitle}>Ownership Matrix</Text>
           </View>
-          <Text style={styles.title}>Ownership Vault</Text>
-          <Text style={styles.subtitle}>
-            Your tokenized gold ownership portfolio
+          <Text style={styles.cardSubtitle}>
+            Rows = GRX owner · Columns = vault location · Highlighted diagonal = domestic holdings.
+            Note: Transfers prioritize foreign holdings and repatriation to reduce cross-border exposure.
           </Text>
-        </View>
 
-        <View style={styles.summaryCard}>
-          <Text style={styles.summaryLabel}>Total Ownership</Text>
-          <Text style={styles.summaryAmount}>{DUMMY_OWNERSHIP_DATA.totalOwnership} GRX</Text>
-          <Text style={styles.summaryValue}>≈ ${DUMMY_OWNERSHIP_DATA.totalValueUSD} USD</Text>
-        </View>
-
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <MaterialIcons name="inventory" size={20} color={GOLD_COLORS.primary} />
-            <Text style={styles.sectionTitle}>Holdings</Text>
-          </View>
-          {DUMMY_OWNERSHIP_DATA.holdings.map((holding) => (
-            <View key={holding.id} style={styles.holdingCard}>
-              <View style={styles.holdingHeader}>
-                <Text style={styles.holdingId}>{holding.id}</Text>
-                <View style={[styles.statusBadge, holding.status === "Active" && styles.statusActive]}>
-                  <Text style={styles.statusText}>{holding.status}</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            <View style={styles.table}>
+              {/* Header Row */}
+              <View style={styles.tableRow}>
+                <View style={[styles.tableCell, styles.headerCell, styles.topLeftCell]}>
+                  <Text style={styles.headerText}>Owner \ Vault →</Text>
+                </View>
+                {COUNTRIES.map(c => (
+                  <View key={`h-${c}`} style={[styles.tableCell, styles.headerCell]}>
+                    <Text style={styles.headerTextBold}>{c}</Text>
+                  </View>
+                ))}
+                <View style={[styles.tableCell, styles.headerCell]}>
+                  <Text style={styles.headerTextBold}>Total</Text>
                 </View>
               </View>
-              <View style={styles.holdingRow}>
-                <Text style={styles.holdingLabel}>Amount:</Text>
-                <Text style={styles.holdingValue}>{holding.amount} GRX</Text>
-              </View>
-              <View style={styles.holdingRow}>
-                <Text style={styles.holdingLabel}>Value:</Text>
-                <Text style={styles.holdingValue}>${holding.valueUSD} USD</Text>
-              </View>
-              <View style={styles.holdingRow}>
-                <Text style={styles.holdingLabel}>Purchase Date:</Text>
-                <Text style={styles.holdingDate}>{holding.purchaseDate}</Text>
-              </View>
-            </View>
-          ))}
-        </View>
 
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <MaterialIcons name="swap-horiz" size={20} color={GOLD_COLORS.primary} />
-            <Text style={styles.sectionTitle}>Recent Transfers</Text>
-          </View>
-          {DUMMY_OWNERSHIP_DATA.recentTransfers.map((transfer) => (
-            <View key={transfer.id} style={styles.transferCard}>
-              <View style={styles.transferHeader}>
-                <Ionicons
-                  name={transfer.type === "Received" ? "arrow-down-circle" : "arrow-up-circle"}
-                  size={24}
-                  color={transfer.type === "Received" ? GOLD_COLORS.primary : theme.colors.textSecondary}
-                />
-                <View style={styles.transferInfo}>
-                  <Text style={styles.transferType}>{transfer.type}</Text>
-                  <Text style={styles.transferAmount}>{transfer.amount} GRX</Text>
+              {/* Data Rows */}
+              {COUNTRIES.map(owner => (
+                <View key={`row-${owner}`} style={styles.tableRow}>
+                  <View style={[styles.tableCell, styles.headerCell]}>
+                    <Text style={styles.headerTextBold}>{owner}</Text>
+                  </View>
+                  {COUNTRIES.map(vault => {
+                    const amount = getAmount(owner, vault);
+                    const isDomestic = owner === vault;
+                    return (
+                      <View 
+                        key={`cell-${owner}-${vault}`} 
+                        style={[
+                          styles.tableCell, 
+                          isDomestic && styles.domesticCell,
+                          amount > 0 && !isDomestic && styles.activeForeignCell
+                        ]}
+                      >
+                        <Text style={[styles.cellText, isDomestic && styles.domesticText, amount === 0 && styles.emptyText]}>
+                          {amount === 0 ? "—" : formatNumber(amount)}
+                        </Text>
+                      </View>
+                    );
+                  })}
+                  <View style={[styles.tableCell, styles.totalCell]}>
+                    <Text style={styles.totalText}>{formatNumber(getRowTotal(owner))}</Text>
+                  </View>
                 </View>
-                <Text style={styles.transferDate}>{transfer.date}</Text>
+              ))}
+
+              {/* Footer Row */}
+              <View style={styles.tableRow}>
+                <View style={[styles.tableCell, styles.headerCell]}>
+                  <Text style={styles.headerTextBold}>Vault Total</Text>
+                </View>
+                {COUNTRIES.map(vault => (
+                  <View key={`f-${vault}`} style={[styles.tableCell, styles.totalCell]}>
+                    <Text style={styles.totalText}>{formatNumber(getColTotal(vault))}</Text>
+                  </View>
+                ))}
+                <View style={[styles.tableCell, styles.totalCell]}>
+                  <Text style={styles.totalText}>
+                    {formatNumber(COUNTRIES.reduce((sum, v) => sum + getColTotal(v), 0))}
+                  </Text>
+                </View>
               </View>
-              <Text style={styles.transferAddress}>
-                {transfer.type === "Received" ? "From: " : "To: "}
-                {transfer.from || transfer.to}
-              </Text>
             </View>
-          ))}
+          </ScrollView>
         </View>
 
-        <TouchableOpacity
-          style={styles.swapButton}
-          onPress={() => navigation.navigate("OwnershipSwap")}
-        >
-          <Ionicons name="swap-vertical" size={24} color="#FFFFFF" />
-          <Text style={styles.swapButtonText}> Ownership Swapping</Text>
-        </TouchableOpacity>
+        {/* Per-Vault Breakdown */}
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <MaterialIcons name="inventory" size={24} color={GOLD_COLORS.dark} />
+            <Text style={styles.cardTitle}>Per-Vault Breakdown</Text>
+          </View>
+          
+          {COUNTRIES.map(vault => {
+            const vaultTotal = getColTotal(vault);
+            if (vaultTotal === 0) return null;
+
+            return (
+              <View key={`breakdown-${vault}`} style={styles.breakdownCard}>
+                <View style={styles.breakdownHeader}>
+                  <Text style={styles.breakdownTitle}>{vault} Vault</Text>
+                  <Text style={styles.breakdownTotal}>{formatNumber(vaultTotal)} GRX</Text>
+                </View>
+                <View style={styles.divider} />
+                
+                {COUNTRIES.map(owner => {
+                  const amount = getAmount(owner, vault);
+                  if (amount === 0) return null;
+                  
+                  const isDomestic = owner === vault;
+                  const percentage = ((amount / vaultTotal) * 100).toFixed(0);
+                  
+                  return (
+                    <View key={`bd-row-${owner}-${vault}`} style={styles.breakdownRow}>
+                      <View style={styles.breakdownRowHeader}>
+                        <Text style={styles.breakdownOwner}>
+                          {owner} {isDomestic ? <Text style={styles.domesticLabel}>(domestic)</Text> : null}
+                        </Text>
+                        <Text style={styles.breakdownAmount}>{percentage}%</Text>
+                      </View>
+                      <Text style={styles.breakdownSubAmount}>{formatNumber(amount)} GRX</Text>
+                      <View style={styles.progressBarBg}>
+                        <View style={[styles.progressBarFill, { width: `${percentage}%`, backgroundColor: isDomestic ? GOLD_COLORS.primary : GOLD_COLORS.dark }]} />
+                      </View>
+                    </View>
+                  );
+                })}
+              </View>
+            );
+          })}
+        </View>
+
       </ScrollView>
     </SafeAreaView>
   );
@@ -147,180 +211,173 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: theme.colors.background,
   },
+  centerContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
   content: {
-    height:"100vh",
-    overflow:"auto",
     padding: theme.spacing.lg,
   },
   header: {
-    alignItems: "center",
     marginBottom: theme.spacing.lg,
-  },
-  iconContainer: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: GOLD_COLORS.light,
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: theme.spacing.md,
   },
   title: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: "700",
-    color: GOLD_COLORS.primary,
-    marginBottom: theme.spacing.xs,
+    color: GOLD_COLORS.dark,
   },
-  subtitle: {
-    fontSize: 16,
-    color: theme.colors.textSecondary,
-    textAlign: "center",
-  },
-  summaryCard: {
-    backgroundColor: GOLD_COLORS.light,
+  card: {
+    backgroundColor: theme.colors.surface,
     borderRadius: theme.borderRadius.lg,
     padding: theme.spacing.lg,
-    alignItems: "center",
-    marginBottom: theme.spacing.lg,
-    borderWidth: 2,
-    borderColor: GOLD_COLORS.primary,
+    marginBottom: theme.spacing.xl,
     ...theme.shadows.medium,
   },
-  summaryLabel: {
-    fontSize: 14,
-    color: theme.colors.textSecondary,
-    marginBottom: theme.spacing.xs,
-    fontWeight: "600",
-  },
-  summaryAmount: {
-    fontSize: 32,
-    fontWeight: "700",
-    color: GOLD_COLORS.dark,
-    marginBottom: theme.spacing.xs,
-  },
-  summaryValue: {
-    fontSize: 16,
-    color: theme.colors.textSecondary,
-  },
-  section: {
-    marginBottom: theme.spacing.lg,
-  },
-  sectionHeader: {
+  cardHeader: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: theme.spacing.md,
-    gap: theme.spacing.xs,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: theme.colors.text,
-  },
-  holdingCard: {
-    backgroundColor: theme.colors.surface,
-    borderRadius: theme.borderRadius.md,
-    padding: theme.spacing.md,
     marginBottom: theme.spacing.sm,
-    borderWidth: 1.5,
-    borderColor: GOLD_COLORS.light,
-    ...theme.shadows.small,
-  },
-  holdingHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: theme.spacing.sm,
-  },
-  holdingId: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: theme.colors.textSecondary,
-  },
-  statusBadge: {
-    paddingHorizontal: theme.spacing.sm,
-    paddingVertical: 4,
-    borderRadius: 12,
-    backgroundColor: theme.colors.textSecondary + "20",
-  },
-  statusActive: {
-    backgroundColor: GOLD_COLORS.light,
-  },
-  statusText: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: GOLD_COLORS.dark,
-  },
-  holdingRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: theme.spacing.xs,
-  },
-  holdingLabel: {
-    fontSize: 14,
-    color: theme.colors.textSecondary,
-  },
-  holdingValue: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: theme.colors.text,
-  },
-  holdingDate: {
-    fontSize: 14,
-    color: theme.colors.textSecondary,
-  },
-  transferCard: {
-    backgroundColor: theme.colors.surface,
-    borderRadius: theme.borderRadius.md,
-    padding: theme.spacing.md,
-    marginBottom: theme.spacing.sm,
-    borderWidth: 1.5,
-    borderColor: GOLD_COLORS.light,
-    ...theme.shadows.small,
-  },
-  transferHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: theme.spacing.xs,
     gap: theme.spacing.sm,
   },
-  transferInfo: {
-    flex: 1,
+  cardTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: theme.colors.text,
   },
-  transferType: {
+  cardSubtitle: {
+    fontSize: 12,
+    color: theme.colors.textSecondary,
+    marginBottom: theme.spacing.lg,
+    lineHeight: 18,
+  },
+  table: {
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    borderRadius: theme.borderRadius.sm,
+    overflow: 'hidden',
+  },
+  tableRow: {
+    flexDirection: "row",
+    borderBottomWidth: 1,
+    borderBottomColor: "#E5E7EB",
+  },
+  tableCell: {
+    width: 100,
+    paddingVertical: theme.spacing.md,
+    paddingHorizontal: theme.spacing.sm,
+    justifyContent: "center",
+    alignItems: "center",
+    borderRightWidth: 1,
+    borderRightColor: "#E5E7EB",
+  },
+  topLeftCell: {
+    alignItems: "flex-start",
+  },
+  headerCell: {
+    backgroundColor: "#F9FAFB",
+  },
+  domesticCell: {
+    backgroundColor: GOLD_COLORS.faded,
+  },
+  activeForeignCell: {
+    backgroundColor: "#F3F4F6",
+  },
+  totalCell: {
+    backgroundColor: GOLD_COLORS.faded,
+  },
+  headerText: {
+    fontSize: 11,
+    color: theme.colors.textSecondary,
+  },
+  headerTextBold: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: theme.colors.text,
+  },
+  cellText: {
+    fontSize: 13,
+    color: theme.colors.text,
+  },
+  emptyText: {
+    color: theme.colors.textSecondary,
+  },
+  domesticText: {
+    color: GOLD_COLORS.dark,
+    fontWeight: "600",
+  },
+  totalText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: GOLD_COLORS.dark,
+  },
+  breakdownCard: {
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    borderRadius: theme.borderRadius.md,
+    padding: theme.spacing.md,
+    marginBottom: theme.spacing.md,
+    backgroundColor: "#FAFAFA",
+  },
+  breakdownHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  breakdownTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: theme.colors.text,
+  },
+  breakdownTotal: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: theme.colors.textSecondary,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: "#E5E7EB",
+    marginVertical: theme.spacing.md,
+  },
+  breakdownRow: {
+    marginBottom: theme.spacing.md,
+  },
+  breakdownRowHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 4,
+  },
+  breakdownOwner: {
     fontSize: 14,
     fontWeight: "600",
     color: theme.colors.text,
   },
-  transferAmount: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: GOLD_COLORS.primary,
-  },
-  transferDate: {
+  domesticLabel: {
     fontSize: 12,
+    fontWeight: "400",
+    color: GOLD_COLORS.dark,
+  },
+  breakdownAmount: {
+    fontSize: 14,
     color: theme.colors.textSecondary,
   },
-  transferAddress: {
+  breakdownSubAmount: {
     fontSize: 12,
     color: theme.colors.textSecondary,
-    fontFamily: "monospace",
+    marginBottom: 8,
   },
-  swapButton: {
-    backgroundColor: GOLD_COLORS.primary,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: theme.spacing.md,
-    borderRadius: theme.borderRadius.lg,
-    marginTop: theme.spacing.md,
-    ...theme.shadows.medium,
+  progressBarBg: {
+    height: 6,
+    backgroundColor: "#E5E7EB",
+    borderRadius: 3,
+    overflow: "hidden",
   },
-  swapButtonText: {
-    color: "#FFFFFF",
-    fontSize: 18,
-    fontWeight: "600",
+  progressBarFill: {
+    height: "100%",
+    borderRadius: 3,
   },
 });
 
 export default VaultScreen;
+
 
