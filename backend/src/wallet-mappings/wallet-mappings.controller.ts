@@ -4,7 +4,7 @@ import { WalletMappingsService } from './wallet-mappings.service';
 // For now, let's keep it open or assume the frontend handles it. 
 // The user might want this to be an admin only route, but let's just make it a basic endpoint first.
 
-@Controller('api/wallet-mappings')
+@Controller('wallet-mappings')
 export class WalletMappingsController {
   constructor(private readonly walletMappingsService: WalletMappingsService) {}
 

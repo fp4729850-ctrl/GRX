@@ -1,7 +1,7 @@
 import { Controller, Get, Post, Body } from '@nestjs/common';
 import { ClaimMatrixService } from './claim-matrix.service';
 
-@Controller('api/claim-matrix')
+@Controller('claim-matrix')
 export class ClaimMatrixController {
   constructor(private readonly claimMatrixService: ClaimMatrixService) {}
 
