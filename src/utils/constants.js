@@ -1,10 +1,10 @@
 // GRX Chain Cosmos configuration
 export const GRX_CHAIN_CONFIG = {
   RPC_URL:
-    (typeof process !== 'undefined' && process.env?.EXPO_PUBLIC_GRX_RPC_URL) ||
+    (typeof process !== 'undefined' && process.env.EXPO_PUBLIC_GRX_RPC_URL) ||
     'https://rpc.grxglobal.in',
   REST_URL:
-    (typeof process !== 'undefined' && process.env?.EXPO_PUBLIC_GRX_REST_URL) ||
+    (typeof process !== 'undefined' && process.env.EXPO_PUBLIC_GRX_REST_URL) ||
     'https://api.grxglobal.in',
   PREFIX: 'grx',
 };
@@ -40,18 +40,18 @@ export const GRX_TOKEN_METADATA = {
 export const COINGECKO_API = 'https://api.coingecko.com/api/v3/simple/price';
 
 export const ORACLE_API_URL =
-  (typeof process !== 'undefined' && process.env?.EXPO_PUBLIC_ORACLE_API) ||
+  (typeof process !== 'undefined' && process.env.EXPO_PUBLIC_ORACLE_API) ||
   null;
 
 export const API_BASE_URL =
-  (typeof process !== 'undefined' && process.env?.EXPO_PUBLIC_API_BASE_URL) ||
+  (typeof process !== 'undefined' && process.env.EXPO_PUBLIC_API_BASE_URL) ||
   null;
 
 // Oracle snapshot configuration
 export const ORACLE_SNAPSHOT_CONFIG = {
   allowedWindowMinutes:
     (typeof process !== 'undefined' &&
-      parseInt(process.env?.EXPO_PUBLIC_ORACLE_WINDOW_MINUTES)) ||
+      parseInt(process.env.EXPO_PUBLIC_ORACLE_WINDOW_MINUTES)) ||
     10,
   pollIntervalMs: 30000, // 30 seconds
 };
