@@ -6,6 +6,7 @@ import { PrismaModule } from '../common/prisma/prisma.module';
 @Module({
   imports: [PrismaModule],
   providers: [ClaimMatrixService],
-  controllers: [ClaimMatrixController]
+  controllers: [ClaimMatrixController],
+  exports: [ClaimMatrixService]
 })
 export class ClaimMatrixModule {}
