@@ -34,7 +34,7 @@ import {
   getGasPrice,
 } from '../services/networkService';
 import { sendCustodialTransaction } from '../services/custodialService';
-import { getWalletAddress } from '../services/storageService';
+import { getWalletAddress, getMnemonic } from '../services/storageService';
 import { validateAddress, validateAmount } from '../utils/validation';
 import { useGRXBalance } from '../hooks/useGRXBalance';
 import { useGrxPricing } from '../hooks/useGrxPricing';
@@ -664,35 +664,33 @@ const SendScreen = ({ navigation }) => {
         return;
       }
 
-      // GRX chain only supports GRX token transfers
-      // Note: sendGRXTransaction, sendTransaction, and sendTokenTransaction functions
-      // may need to be updated for Cosmos/GRX chain compatibility
-      Alert.alert(
-        'Not Implemented',
-        'Direct GRX chain transactions are not yet implemented. Please use custodial mode or wait for Cosmos transaction support.',
-        [{ text: 'OK' }]
-      );
-      return;
+      // GRX chain frontend signing logic
+      const mnemonic = await getMnemonic();
+      if (!mnemonic) {
+        Alert.alert('Error', 'Wallet mnemonic not found on device. Cannot sign transaction.');
+        setLoading(false);
+        return;
+      }
       
-      // TODO: Implement Cosmos/GRX chain transaction sending
-      // let tx;
-      // if (tokenType === 'GRX') {
-      //   tx = await sendGRXChainTransaction(
-      //     mnemonic,
-      //     recipient,
-      //     amount
-      //   );
-      // }
+      const privateKey = ethers.HDNodeWallet.fromPhrase(mnemonic).privateKey;
+
+      let tx;
+      if (tokenType === 'GRX') {
+        tx = await sendGRXTransaction(
+          privateKey,
+          recipient,
+          amount,
+          gasLimit || undefined,
+          'GRX',
+          false // isTestnet
+        );
+      }
 
       Alert.alert('Success', `Transaction sent! Hash: ${tx.hash}`, [
         {
           text: 'OK',
           onPress: () => {
             navigation.goBack();
-            // Refresh balances
-            setTimeout(() => {
-              // Trigger balance refresh in dashboard
-            }, 2000);
           },
         },
       ]);
