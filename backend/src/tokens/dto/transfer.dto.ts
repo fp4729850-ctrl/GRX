@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsEnum } from 'class-validator';
+import { IsString, IsNotEmpty, IsEnum, IsOptional } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { NetworkType } from '../../wallets/dto/create-wallet.dto';
 
@@ -26,5 +26,10 @@ export class TransferDto {
   @IsNotEmpty()
   @IsString()
   from: string;
+
+  @ApiProperty({ description: 'Password for custodial wallets', required: false })
+  @IsOptional()
+  @IsString()
+  password?: string;
 }
 

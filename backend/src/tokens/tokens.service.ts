@@ -300,12 +300,50 @@ export class TokensService {
         throw new BadRequestException('Insufficient balance');
       }
 
-      // For now, return instructions for client-side signing
-      // In production, you'd handle private key decryption here
+      // If wallet is not custodial, we can't send it from backend
+      if (!wallet.isCustodial) {
+        return {
+          success: false,
+          message:
+            'Transfer requires client-side signing. Please use the wallet to sign the transaction.',
+          to: dto.to,
+          amount: dto.amount,
+          amountWei: amountWei.toString(),
+          network: dto.network,
+          isTestnet: dto.isTestnet,
+        };
+      }
+
+      // If wallet is custodial, we need a password
+      if (!dto.password) {
+        throw new BadRequestException('Password is required to transfer from a custodial wallet');
+      }
+
+      // Decrypt private key
+      const { privateKey } = await this.walletsService.decryptPrivateKey(
+        dto.from,
+        dto.password,
+        userId,
+      );
+
+      // Create signer wallet connected to the contract's provider
+      const signer = new ethers.Wallet(privateKey, contract.runner as ethers.Provider);
+      const contractWithSigner = contract.connect(signer);
+
+      this.logger.log(`Initiating custodial transfer of ${dto.amount} GRX from ${dto.from} to ${dto.to}`);
+
+      // Execute transfer
+      const tx = await (contractWithSigner as any).transfer(dto.to, amountWei);
+      
+      this.logger.log(`Transfer transaction broadcasted: ${tx.hash}`);
+
+      // Wait for confirmation (optional, but good for returning final state)
+      // We can also just return the txHash immediately
+      
       return {
-        success: false,
-        message:
-          'Transfer requires client-side signing. Please use the wallet to sign the transaction.',
+        success: true,
+        message: 'Transfer successful',
+        txHash: tx.hash,
         to: dto.to,
         amount: dto.amount,
         amountWei: amountWei.toString(),
