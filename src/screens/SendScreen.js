@@ -35,6 +35,7 @@ import {
 } from '../services/networkService';
 import { sendCustodialTransaction } from '../services/custodialService';
 import { getWalletAddress, getMnemonic } from '../services/storageService';
+import { sendGRXTokens } from '../services/grxChainService';
 import { validateAddress, validateAmount } from '../utils/validation';
 import { useGRXBalance } from '../hooks/useGRXBalance';
 import { useGrxPricing } from '../hooks/useGrxPricing';
@@ -672,21 +673,16 @@ const SendScreen = ({ navigation }) => {
         return;
       }
       
-      const privateKey = ethers.HDNodeWallet.fromPhrase(mnemonic).privateKey;
-
-      let tx;
+      let txHash;
       if (tokenType === 'GRX') {
-        tx = await sendGRXTransaction(
-          privateKey,
+        txHash = await sendGRXTokens(
+          mnemonic,
           recipient,
-          amount,
-          gasLimit || undefined,
-          'GRX',
-          false // isTestnet
+          amount
         );
       }
 
-      Alert.alert('Success', `Transaction sent! Hash: ${tx.hash}`, [
+      Alert.alert('Success', `Transaction sent! Hash: ${txHash}`, [
         {
           text: 'OK',
           onPress: () => {
