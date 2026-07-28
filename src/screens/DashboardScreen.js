@@ -23,6 +23,7 @@ import { theme } from "../styles/theme";
 import { fetchMetalPrices } from "../services/metalPriceService";
 import { fetchOracleSnapshot } from "../services/oracleSnapshotService";
 import { fetchCombinedTransactionHistory } from "../services/transactionHistoryService";
+import { getWalletMappings } from "../services/storageService";
 
 // Gold color constants
 const GOLD_COLORS = {
@@ -77,6 +78,7 @@ const DashboardScreen = ({ navigation }) => {
   const [oracleError, setOracleError] = useState(null);
   const [transactions, setTransactions] = useState([]);
   const [transactionsLoading, setTransactionsLoading] = useState(false);
+  const [walletCountry, setWalletCountry] = useState(null);
   const scrollX = useRef(new Animated.Value(0)).current;
   
   // Get screen width for responsive design
@@ -95,6 +97,21 @@ const DashboardScreen = ({ navigation }) => {
     
     return () => clearTimeout(initialLoad);
   }, []);
+
+  useEffect(() => {
+    if (walletAddress) {
+      getWalletMappings().then(mappings => {
+        if (mappings && mappings.length > 0) {
+          const mapping = mappings.find(m => m.address === walletAddress);
+          if (mapping) {
+            setWalletCountry(mapping.country);
+          } else {
+            setWalletCountry(null);
+          }
+        }
+      }).catch(err => console.log('Error fetching mappings', err));
+    }
+  }, [walletAddress]);
 
   // DISABLED: Automatic transaction history loading causes too many API calls
   // useEffect(() => {
@@ -271,9 +288,19 @@ const DashboardScreen = ({ navigation }) => {
         <View style={styles.addressContainer}>
           <Text style={styles.addressLabel}>Wallet Address</Text>
           <View style={styles.addressRow}>
-            <Text style={styles.addressText}>
-              {formatAddress(walletAddress)}
-            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <Text style={styles.addressText}>
+                {formatAddress(walletAddress)}
+              </Text>
+              {walletCountry && (
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginLeft: 8, backgroundColor: '#E8F5E9', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 12, borderWidth: 1, borderColor: '#4CAF50' }}>
+                  <Ionicons name="checkmark-circle" size={14} color="#4CAF50" />
+                  <Text style={{ fontSize: 12, fontWeight: 'bold', color: '#4CAF50', marginLeft: 4 }}>
+                    {walletCountry}
+                  </Text>
+                </View>
+              )}
+            </View>
             <TouchableOpacity
               style={styles.copyButton}
               onPress={handleCopyAddress}
