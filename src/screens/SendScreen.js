@@ -34,7 +34,8 @@ import {
   getGasPrice,
 } from '../services/networkService';
 import { sendCustodialTransaction } from '../services/custodialService';
-import { getWalletAddress, getMnemonic } from '../services/storageService';
+import { getWalletAddress, getMnemonic, getWalletMappings } from '../services/storageService';
+import { claimMatrixService } from '../services/claimMatrixService';
 import { sendGRXTokens } from '../services/grxChainService';
 import { validateAddress, validateAmount } from '../utils/validation';
 import { useGRXBalance } from '../hooks/useGRXBalance';
@@ -65,6 +66,7 @@ const SendScreen = ({ navigation }) => {
   const [gasLimit, setGasLimit] = useState('');
   const [tokenType, setTokenType] = useState('GRX'); // GRX only
   const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
   const [showConfirm, setShowConfirm] = useState(false);
   const [transactionFee, setTransactionFee] = useState('0');
   const [estimatedGas, setEstimatedGas] = useState(null);
@@ -112,30 +114,34 @@ const SendScreen = ({ navigation }) => {
     }
 
     const fxMap = {
-      INR:
+      USD_INR:
         pricing.fx?.USD_INR ??
         pricing.fx?.INR ??
         pricing.fx?.usd_inr ??
         pricing.fx?.usdInr ??
         null,
-      AED:
+      USD_AED:
         pricing.fx?.USD_AED ??
         pricing.fx?.AED ??
         pricing.fx?.usd_aed ??
         pricing.fx?.usdAed ??
         null,
-      RUB:
+      USD_RUB:
         pricing.fx?.USD_RUB ??
         pricing.fx?.RUB ??
         pricing.fx?.usd_rub ??
         pricing.fx?.usdRub ??
         null,
-      CNY:
+      USD_CNY:
         pricing.fx?.USD_CNY ??
         pricing.fx?.CNY ??
         pricing.fx?.usd_cny ??
         pricing.fx?.usdCny ??
         null,
+      INR: pricing.fx?.USD_INR ?? pricing.fx?.INR ?? null,
+      AED: pricing.fx?.USD_AED ?? pricing.fx?.AED ?? null,
+      RUB: pricing.fx?.USD_RUB ?? pricing.fx?.RUB ?? null,
+      CNY: pricing.fx?.USD_CNY ?? pricing.fx?.CNY ?? null,
     };
 
     return {
@@ -446,41 +452,52 @@ const SendScreen = ({ navigation }) => {
   };
 
   const handleSend = () => {
+    console.log("Send button clicked. State:", { grxSendDisabled, recipient, amount, balance: grxBalance });
+    
     if (grxSendDisabled) {
-      Alert.alert(
-        'Live pricing unavailable',
-        'Oracle snapshot is stale or gold price unavailable. Refresh pricing before sending.',
-        [
-          {
-            text: 'Refresh',
-            onPress: refreshPricing,
-          },
-          {
-            text: 'Cancel',
-            style: 'cancel',
-          },
-        ]
-      );
+      console.log("Error: grxSendDisabled is true");
+      try {
+        Alert.alert(
+          'Live pricing unavailable',
+          'Oracle snapshot is stale or gold price unavailable. Refresh pricing before sending.',
+          [
+            {
+              text: 'Refresh',
+              onPress: refreshPricing,
+            },
+            {
+              text: 'Cancel',
+              style: 'cancel',
+            },
+          ]
+        );
+      } catch (e) {
+        window.alert('Oracle snapshot is stale. Refresh pricing before sending.');
+      }
       return;
     }
 
     if (!recipient || !validateAddress(recipient)) {
-      Alert.alert('Error', 'Please enter a valid recipient address');
+      console.log("Error: invalid recipient address:", recipient);
+      try { Alert.alert('Error', 'Please enter a valid recipient address'); } catch(e) { window.alert('Please enter a valid recipient address'); }
       return;
     }
 
     if (!amount || !validateAmount(amount)) {
-      Alert.alert('Error', 'Please enter a valid amount');
+      console.log("Error: invalid amount:", amount);
+      try { Alert.alert('Error', 'Please enter a valid amount'); } catch(e) { window.alert('Please enter a valid amount'); }
       return;
     }
 
     // GRX chain only supports GRX tokens
     const balance = grxBalance || DUMMY_GRX_BALANCE;
     if (parseFloat(amount) > parseFloat(balance)) {
-      Alert.alert('Error', 'Insufficient balance');
+      console.log("Error: insufficient balance");
+      try { Alert.alert('Error', 'Insufficient balance'); } catch(e) { window.alert('Insufficient balance'); }
       return;
     }
 
+    console.log("Validation passed, showing confirm modal");
     setShowConfirm(true);
   };
 
@@ -640,7 +657,8 @@ const SendScreen = ({ navigation }) => {
 
   const handleConfirmTransaction = async () => {
     setLoading(true);
-    setShowConfirm(false);
+    setErrorMessage('');
+    // Do not close modal yet
 
     try {
       if (custodialMode) {
@@ -652,23 +670,32 @@ const SendScreen = ({ navigation }) => {
           network: 'GRX',
           isTestnet: false,
         });
-        Alert.alert(
-          'Request Submitted',
-          `Custodial transfer queued. Reference: ${response?.reference || response?.id || 'pending'}`,
-          [
-            {
-              text: 'OK',
-              onPress: () => navigation.goBack(),
-            },
-          ]
-        );
+        try {
+          Alert.alert(
+            'Request Submitted',
+            `Custodial transfer queued. Reference: ${response?.reference || response?.id || 'pending'}`,
+            [
+              {
+                text: 'OK',
+                onPress: () => {
+                  setShowConfirm(false);
+                  navigation.goBack();
+                },
+              },
+            ]
+          );
+        } catch (e) {
+          window.alert(`Custodial transfer queued. Reference: ${response?.reference || response?.id || 'pending'}`);
+          setShowConfirm(false);
+          navigation.goBack();
+        }
         return;
       }
 
       // GRX chain frontend signing logic
       const mnemonic = await getMnemonic();
       if (!mnemonic) {
-        Alert.alert('Error', 'Wallet mnemonic not found on device. Cannot sign transaction.');
+        setErrorMessage('Wallet mnemonic not found on device. Cannot sign transaction.');
         setLoading(false);
         return;
       }
@@ -680,35 +707,53 @@ const SendScreen = ({ navigation }) => {
           recipient,
           amount
         );
+        
+        // Update Ownership Matrix
+        try {
+          const mappings = await getWalletMappings();
+          const senderMapping = mappings.find(m => m.address === walletAddress);
+          const receiverMapping = mappings.find(m => m.address === recipient);
+          
+          if (senderMapping && receiverMapping) {
+            // Even if same country, call it to trigger potential logic (or backend handles it)
+            if (senderMapping.country !== receiverMapping.country) {
+              await claimMatrixService.transfer(
+                senderMapping.country,
+                receiverMapping.country,
+                parseFloat(amount)
+              );
+            }
+          }
+        } catch (matrixErr) {
+          console.error('Failed to update ownership matrix:', matrixErr);
+        }
       }
 
-      Alert.alert('Success', `Transaction sent! Hash: ${txHash}`, [
-        {
-          text: 'OK',
-          onPress: () => {
-            navigation.goBack();
+      try {
+        Alert.alert('Success', `Transaction sent! Hash: ${txHash}`, [
+          {
+            text: 'OK',
+            onPress: () => {
+              setShowConfirm(false);
+              navigation.goBack();
+            },
           },
-        },
-      ]);
+        ]);
+      } catch (e) {
+        window.alert(`Transaction sent! Hash: ${txHash}`);
+        setShowConfirm(false);
+        navigation.goBack();
+      }
     } catch (error) {
       console.error('Transaction error:', error);
       
       // Check for insufficient funds error
       if (error.code === 'INSUFFICIENT_FUNDS' || error.message?.includes('insufficient funds')) {
-        Alert.alert(
-          'Insufficient Funds',
-          'You do not have enough balance to complete this transaction. Please check your wallet balance and try again.'
-        );
+        setErrorMessage('You do not have enough balance to complete this transaction. Please check your wallet balance and try again.');
       } else if (error.code === 'UNPREDICTABLE_GAS_LIMIT') {
-        Alert.alert(
-          'Transaction Error',
-          'Unable to estimate gas. This may be due to insufficient funds or an invalid transaction. Please check your balance and try again.'
-        );
+        setErrorMessage('Unable to estimate gas. This may be due to insufficient funds or an invalid transaction. Please check your balance and try again.');
       } else {
-        Alert.alert(
-          'Transaction Failed',
-          error.message || 'An error occurred while sending the transaction. Please try again.'
-        );
+        setErrorMessage(error.message || 'An error occurred while sending the transaction. Please try again.');
       }
     } finally {
       setLoading(false);
@@ -1042,13 +1087,21 @@ const SendScreen = ({ navigation }) => {
           </View>
         )}
 
+        {errorMessage ? (
+          <View style={{ padding: 10, backgroundColor: '#ffebee', borderRadius: 8, marginBottom: 15, borderWidth: 1, borderColor: '#f44336' }}>
+            <Text style={{ color: '#d32f2f', textAlign: 'center', fontWeight: 'bold' }}>
+              Error: {errorMessage}
+            </Text>
+          </View>
+        ) : null}
+
         <TouchableOpacity
           style={[
             styles.sendButton,
             (loading || grxSendDisabled) && styles.buttonDisabled,
           ]}
           onPress={handleSend}
-          disabled={loading || grxSendDisabled}
+          disabled={loading}
         >
           {loading ? (
             <ActivityIndicator color={theme.colors.secondary} />

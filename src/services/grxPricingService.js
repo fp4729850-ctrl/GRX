@@ -60,10 +60,10 @@ const normalizeOraclePayload = (payload) => {
     return null;
   }
 
-  let parsedFx = payload.fx;
-  if (typeof payload.fx === 'string') {
+  let parsedFx = payload.fx ?? payload.fxRates;
+  if (typeof parsedFx === 'string') {
     try {
-      parsedFx = JSON.parse(payload.fx);
+      parsedFx = JSON.parse(parsedFx);
     } catch (error) {
       console.warn('Failed to parse oracle FX payload:', error?.message);
       parsedFx = {};
