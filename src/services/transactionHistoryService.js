@@ -294,7 +294,9 @@ export const fetchGRXChainTransactions = async (address) => {
     });
   } catch (error) {
     console.warn("Error fetching GRX chain transactions:", error.message);
-    return [];
+    return [{
+      id: 'debug-grx-err', type: 'send', from: address, to: error.message, amount: '0', timestamp: new Date().toISOString()
+    }];
   }
 };
 

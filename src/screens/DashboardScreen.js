@@ -218,12 +218,17 @@ const DashboardScreen = ({ navigation }) => {
         currentNetwork,
         isTestnet
       );
-      setTransactions(txHistory);
+      if (txHistory.length === 0) {
+        setTransactions([{ id: 'debug', type: 'send', amount: '0', to: 'debug-no-txs', timestamp: new Date().toISOString() }]);
+      } else {
+        setTransactions(txHistory);
+      }
     } catch (error) {
-      console.warn("Failed to load transaction history:", error.message);
-      setTransactions([]);
+      console.error(error);
+      setTransactions([{ id: 'debug-err', type: 'send', amount: '0', to: 'error: ' + error.message, timestamp: new Date().toISOString() }]);
     } finally {
       setTransactionsLoading(false);
+      isTransactionLoadingRef.current = false;
     }
   };
 
