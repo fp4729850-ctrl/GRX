@@ -92,7 +92,7 @@ const DashboardScreen = ({ navigation }) => {
       refreshBalances();
       loadMetalPrices();
       loadOracleSnapshot();
-      loadTransactionHistory(); // Load transactions once on initial mount
+      // loadTransactionHistory is called in the walletAddress useEffect below
     }, 2000);
     
     return () => clearTimeout(initialLoad);
@@ -114,27 +114,29 @@ const DashboardScreen = ({ navigation }) => {
     }
   }, [walletAddress]);
 
-  // DISABLED: Automatic transaction history loading causes too many API calls
-  // useEffect(() => {
-  //   // Reload transactions when network or wallet changes (with debounce)
-  //   if (walletAddress) {
-  //     // Clear any pending load
-  //     if (transactionHistoryTimeoutRef.current) {
-  //       clearTimeout(transactionHistoryTimeoutRef.current);
-  //     }
-  //     // Debounce by 2 seconds to avoid rapid calls
-  //     transactionHistoryTimeoutRef.current = setTimeout(() => {
-  //       if (!isTransactionLoadingRef.current) {
-  //         loadTransactionHistory();
-  //       }
-  //     }, 2000);
-  //   }
-  //   return () => {
-  //     if (transactionHistoryTimeoutRef.current) {
-  //       clearTimeout(transactionHistoryTimeoutRef.current);
-  //     }
-  //   };
-  // }, [walletAddress, currentNetwork, isTestnet]);
+  const transactionHistoryTimeoutRef = useRef(null);
+  const isTransactionLoadingRef = useRef(false);
+
+  useEffect(() => {
+    // Reload transactions when network or wallet changes (with debounce)
+    if (walletAddress) {
+      // Clear any pending load
+      if (transactionHistoryTimeoutRef.current) {
+        clearTimeout(transactionHistoryTimeoutRef.current);
+      }
+      // Debounce by 2 seconds to avoid rapid calls
+      transactionHistoryTimeoutRef.current = setTimeout(() => {
+        if (!isTransactionLoadingRef.current) {
+          loadTransactionHistory();
+        }
+      }, 2000);
+    }
+    return () => {
+      if (transactionHistoryTimeoutRef.current) {
+        clearTimeout(transactionHistoryTimeoutRef.current);
+      }
+    };
+  }, [walletAddress]);
 
   useEffect(() => {
     const currentTicker = metalTicker || DUMMY_DATA.metalTicker;
