@@ -5,6 +5,8 @@ import { NETWORKS } from "../utils/constants";
 import { getProvider } from "./networkService";
 import { fetchBackendInvoices } from "./backendInvoiceService";
 import { getInvoices } from "./invoiceService";
+import { StargateClient } from "@cosmjs/stargate";
+import { GRX_CHAIN_CONFIG } from "../utils/constants";
 
 /**
  * Fetch on-chain transactions using ethers provider
@@ -225,19 +227,90 @@ export const fetchMintTransactions = async (address) => {
 };
 
 /**
+ * Fetch GRX Cosmos chain transactions
+ */
+export const fetchGRXChainTransactions = async (address) => {
+  if (!address || !address.startsWith('grx')) return [];
+  try {
+    let rpcUrl = GRX_CHAIN_CONFIG.RPC_URL;
+    if (typeof window !== 'undefined') {
+      rpcUrl = window.location.origin + '/rpc';
+    }
+    const client = await StargateClient.connect(rpcUrl);
+    
+    // Fetch both sent and received transactions
+    const [sentTxs, receivedTxs] = await Promise.all([
+      client.searchTx([{ key: "transfer.sender", value: address }]),
+      client.searchTx([{ key: "transfer.recipient", value: address }])
+    ]);
+
+    const allGRXTxs = [...sentTxs, ...receivedTxs];
+    
+    // Map Cosmos TX responses to our internal format
+    return allGRXTxs.map(tx => {
+      let amount = "0";
+      let toAddress = null;
+      let fromAddress = null;
+
+      try {
+        // Simple heuristic to extract amount and addresses from raw log events
+        const log = JSON.parse(tx.rawLog || "[]")[0];
+        if (log && log.events) {
+          const transferEvent = log.events.find(e => e.type === "transfer");
+          if (transferEvent) {
+            const amountAttr = transferEvent.attributes.find(a => a.key === "amount");
+            const senderAttr = transferEvent.attributes.find(a => a.key === "sender");
+            const recipientAttr = transferEvent.attributes.find(a => a.key === "recipient");
+            
+            if (amountAttr) {
+              // Usually formatted like '1000000ugrx'
+              const rawAmount = amountAttr.value.replace(/[^0-9]/g, '');
+              if (rawAmount) amount = (parseFloat(rawAmount) / 1000000).toString();
+            }
+            if (senderAttr) fromAddress = senderAttr.value;
+            if (recipientAttr) toAddress = recipientAttr.value;
+          }
+        }
+      } catch (e) {
+        console.warn("Error parsing GRX tx log:", e);
+      }
+
+      return {
+        id: tx.hash,
+        type: fromAddress === address ? "send" : "receive",
+        from: fromAddress,
+        to: toAddress,
+        amount: amount,
+        token: "GRX",
+        timestamp: new Date().toISOString(), // Fallback if block time isn't available
+        txHash: tx.hash,
+        status: tx.code === 0 ? "confirmed" : "failed",
+        network: "GRX Chain",
+        isTestnet: false,
+        source: "onchain",
+      };
+    });
+  } catch (error) {
+    console.warn("Error fetching GRX chain transactions:", error.message);
+    return [];
+  }
+};
+
+/**
  * Combine all transaction sources and sort by recent first
  */
 export const fetchCombinedTransactionHistory = async (address, networkKey, isTestnet = false) => {
   try {
-    const [onChain, custodial, burns, mints] = await Promise.all([
+    const [onChain, custodial, burns, mints, grxChain] = await Promise.all([
       fetchOnChainTransactions(address, networkKey, isTestnet),
       fetchCustodialTransactions(address),
       fetchBurnTransactions(address),
       fetchMintTransactions(address),
+      fetchGRXChainTransactions(address)
     ]);
 
     // Combine all transactions
-    const allTransactions = [...onChain, ...custodial, ...burns, ...mints];
+    const allTransactions = [...onChain, ...custodial, ...burns, ...mints, ...grxChain];
 
     // Sort by timestamp (recent first)
     allTransactions.sort((a, b) => {

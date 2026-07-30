@@ -79,6 +79,7 @@ const DashboardScreen = ({ navigation }) => {
   const [transactions, setTransactions] = useState([]);
   const [transactionsLoading, setTransactionsLoading] = useState(false);
   const [walletCountry, setWalletCountry] = useState(null);
+  const [allMappings, setAllMappings] = useState([]);
   const scrollX = useRef(new Animated.Value(0)).current;
   
   // Get screen width for responsive design
@@ -87,12 +88,11 @@ const DashboardScreen = ({ navigation }) => {
 
   useEffect(() => {
     // Initial load with delay to avoid rate limiting
-    // DISABLED: loadTransactionHistory() - causes too many API calls
     const initialLoad = setTimeout(() => {
       refreshBalances();
       loadMetalPrices();
       loadOracleSnapshot();
-      // loadTransactionHistory(); // Disabled to prevent rate limiting
+      loadTransactionHistory(); // Load transactions once on initial mount
     }, 2000);
     
     return () => clearTimeout(initialLoad);
@@ -102,6 +102,7 @@ const DashboardScreen = ({ navigation }) => {
     if (walletAddress) {
       getWalletMappings().then(mappings => {
         if (mappings && mappings.length > 0) {
+          setAllMappings(mappings);
           const mapping = mappings.find(m => m.address === walletAddress);
           if (mapping) {
             setWalletCountry(mapping.country);
@@ -631,8 +632,8 @@ const DashboardScreen = ({ navigation }) => {
                           : tx.source === "burn"
                           ? "Redeem"
                           : "Mint"}
-                        {tx.to && isSend && ` • To: ${formatAddress(tx.to)}`}
-                        {tx.from && isReceive && ` • From: ${formatAddress(tx.from)}`}
+                        {tx.to && isSend && ` • To: ${allMappings.find(m => m.address === tx.to)?.country ? allMappings.find(m => m.address === tx.to).country + ' (' + formatAddress(tx.to) + ')' : formatAddress(tx.to)}`}
+                        {tx.from && isReceive && ` • From: ${allMappings.find(m => m.address === tx.from)?.country ? allMappings.find(m => m.address === tx.from).country + ' (' + formatAddress(tx.from) + ')' : formatAddress(tx.from)}`}
                       </Text>
                       <Text style={styles.transactionTime}>
                         {tx.timestamp
