@@ -176,7 +176,7 @@ export const createMintTransaction = async (mnemonic, mintDetails) => {
   try {
     let rpcUrl = GRX_CHAIN_CONFIG.RPC_URL;
     if (typeof window !== 'undefined') {
-      rpcUrl = '/rpc';
+      rpcUrl = window.location.origin + '/rpc';
     }
     
     if (!rpcUrl) {
@@ -273,7 +273,7 @@ export const burnGRX = async (mnemonic, amount) => {
   try {
     let rpcUrl = GRX_CHAIN_CONFIG.RPC_URL;
     if (typeof window !== 'undefined') {
-      rpcUrl = '/rpc';
+      rpcUrl = window.location.origin + '/rpc';
     }
     
     if (!rpcUrl) {
@@ -371,7 +371,7 @@ export const sendGRXTokens = async (mnemonic, recipient, amount, memo = '') => {
   try {
     let rpcUrl = GRX_CHAIN_CONFIG.RPC_URL;
     if (typeof window !== 'undefined') {
-      rpcUrl = '/rpc';
+      rpcUrl = window.location.origin + '/rpc';
     }
     
     if (!rpcUrl) {
