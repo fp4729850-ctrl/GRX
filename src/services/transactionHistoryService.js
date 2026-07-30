@@ -253,23 +253,25 @@ export const fetchGRXChainTransactions = async (address) => {
       let fromAddress = null;
 
       try {
-        // Simple heuristic to extract amount and addresses from raw log events
-        const log = JSON.parse(tx.rawLog || "[]")[0];
-        if (log && log.events) {
-          const transferEvent = log.events.find(e => e.type === "transfer");
-          if (transferEvent) {
-            const amountAttr = transferEvent.attributes.find(a => a.key === "amount");
-            const senderAttr = transferEvent.attributes.find(a => a.key === "sender");
-            const recipientAttr = transferEvent.attributes.find(a => a.key === "recipient");
-            
-            if (amountAttr) {
-              // Usually formatted like '1000000ugrx'
-              const rawAmount = amountAttr.value.replace(/[^0-9]/g, '');
-              if (rawAmount) amount = (parseFloat(rawAmount) / 1000000).toString();
-            }
-            if (senderAttr) fromAddress = senderAttr.value;
-            if (recipientAttr) toAddress = recipientAttr.value;
+        // Use pre-parsed events from CosmJS
+        const events = tx.events || [];
+        // The last transfer event usually represents the main token transfer
+        const transferEvents = events.filter(e => e.type === "transfer");
+        if (transferEvents.length > 0) {
+          // Get the last transfer event (in case fee was paid first)
+          const transferEvent = transferEvents[transferEvents.length - 1];
+          const amountAttr = transferEvent.attributes.find(a => a.key === "amount");
+          const senderAttr = transferEvent.attributes.find(a => a.key === "sender");
+          const recipientAttr = transferEvent.attributes.find(a => a.key === "recipient");
+          
+          if (amountAttr) {
+            // Format like '1000000grx' or '1000000ugrx'
+            const rawAmount = amountAttr.value.replace(/[^0-9.]/g, '');
+            // Some Cosmos chains use base units, some don't. Assuming GRX uses 1e6.
+            if (rawAmount) amount = (parseFloat(rawAmount) / 1000000).toString();
           }
+          if (senderAttr) fromAddress = senderAttr.value;
+          if (recipientAttr) toAddress = recipientAttr.value;
         }
       } catch (e) {
         console.warn("Error parsing GRX tx log:", e);
