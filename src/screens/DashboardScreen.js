@@ -422,7 +422,7 @@ const DashboardScreen = ({ navigation }) => {
         </View>
         <View style={styles.mintBalanceCard}>
           <View style={styles.mintHeader}>
-            <Text style={styles.mintTitle}>MINT GRX BALANCE</Text>
+            <Text style={styles.mintTitle}>YOUR GRX BALANCE</Text>
             <View style={styles.iconContainer}>
               <MaterialIcons name="monetization-on" size={28} color={GOLD_COLORS.primary} />
             </View>

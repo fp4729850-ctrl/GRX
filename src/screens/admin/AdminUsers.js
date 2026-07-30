@@ -73,7 +73,7 @@ const AdminUsers = () => {
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.header}>
         <Text style={styles.title}>Wallet Mapping</Text>
-        <Text style={styles.subtitle}>Connect countries to their official wallet addresses</Text>
+        <Text style={styles.subtitle}>Connect countries and the Admin wallet (for fees) to their official addresses</Text>
       </View>
 
       <View style={styles.formContainer}>
@@ -83,7 +83,7 @@ const AdminUsers = () => {
           <Text style={styles.inputLabel}>Country Name</Text>
           <TextInput
             style={styles.input}
-            placeholder="e.g. India, Russia, UAE"
+            placeholder="e.g. India, Russia, UAE, Admin"
             placeholderTextColor={theme.colors.textSecondary}
             value={country}
             onChangeText={setCountry}

@@ -4,6 +4,9 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialIcons } from "@expo/vector-icons";
 import { theme } from "../styles/theme";
 import { claimMatrixService } from "../services/claimMatrixService";
+import { useWallet } from "../context/WalletContext";
+import { getWalletMappings } from "../services/storageService";
+import { isAdminAddress } from "../utils/adminUtils";
 
 // Gold color constants
 const GOLD_COLORS = {
@@ -20,6 +23,8 @@ const VaultScreen = ({ navigation }) => {
   const [matrixData, setMatrixData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [myCountry, setMyCountry] = useState(null);
+  const { walletAddress } = useWallet();
 
   useEffect(() => {
     fetchMatrix();
@@ -28,10 +33,24 @@ const VaultScreen = ({ navigation }) => {
   const fetchMatrix = async () => {
     try {
       setLoading(true);
-      const data = await claimMatrixService.getMatrix();
+      setError(null);
+      
+      // Fetch wallet mappings to identify current user
+      if (walletAddress) {
+        const mappings = await getWalletMappings();
+        const me = mappings.find(m => m.address === walletAddress);
+        if (me) {
+          setMyCountry(me.country);
+        }
+      }
+
+      const response = await claimMatrixService.getMatrix();
+      // Since apiClient resolves interceptors and returns response.data directly
+      // Ensure we handle both { matrix: [...] } and directly [...]
+      const data = response?.matrix || response || [];
       setMatrixData(data);
     } catch (err) {
-      setError("Failed to fetch matrix data");
+      setError(`Failed to fetch matrix data: ${err.message || String(err)}`);
       console.error(err);
     } finally {
       setLoading(false);
@@ -93,15 +112,17 @@ const VaultScreen = ({ navigation }) => {
               {/* Header Row */}
               <View style={styles.tableRow}>
                 <View style={[styles.tableCell, styles.headerCell, styles.topLeftCell]}>
-                  <Text style={styles.headerText}>Owner \ Vault →</Text>
+                  <Text style={styles.headerText}>Owner \ Vault</Text>
+                  <Text style={styles.headerText}>⬇       ➔</Text>
                 </View>
-                {COUNTRIES.map(c => (
-                  <View key={`h-${c}`} style={[styles.tableCell, styles.headerCell]}>
-                    <Text style={styles.headerTextBold}>{c}</Text>
+                {COUNTRIES.map(vault => (
+                  <View key={`h-${vault}`} style={[styles.tableCell, styles.headerCell]}>
+                    <Text style={styles.headerTextBold}>{vault}</Text>
+                    <Text style={{ fontSize: 10, color: '#6B7280', marginTop: 2 }}>(Stored Here)</Text>
                   </View>
                 ))}
                 <View style={[styles.tableCell, styles.headerCell]}>
-                  <Text style={styles.headerTextBold}>Total</Text>
+                  <Text style={styles.headerTextBold}>Total Owned</Text>
                 </View>
               </View>
 
@@ -110,10 +131,18 @@ const VaultScreen = ({ navigation }) => {
                 <View key={`row-${owner}`} style={styles.tableRow}>
                   <View style={[styles.tableCell, styles.headerCell]}>
                     <Text style={styles.headerTextBold}>{owner}</Text>
+                    <Text style={{ fontSize: 10, color: '#6B7280', marginTop: 2 }}>(Owns Gold)</Text>
                   </View>
+                  
                   {COUNTRIES.map(vault => {
                     const amount = getAmount(owner, vault);
                     const isDomestic = owner === vault;
+                    
+                    // Hide domestic balances that do not belong to the logged in user, unless they are admin
+                    const isMyCountry = owner === myCountry;
+                    const isAdmin = isAdminAddress(walletAddress);
+                    const hideDomestic = isDomestic && !isMyCountry && !isAdmin;
+                    
                     return (
                       <View 
                         key={`cell-${owner}-${vault}`} 
@@ -124,8 +153,16 @@ const VaultScreen = ({ navigation }) => {
                         ]}
                       >
                         <Text style={[styles.cellText, isDomestic && styles.domesticText, amount === 0 && styles.emptyText]}>
-                          {amount === 0 ? "—" : formatNumber(amount)}
+                          {hideDomestic ? "****" : (amount === 0 ? "—" : formatNumber(amount))}
                         </Text>
+                        {!isDomestic && amount > 0 && (
+                          <Text style={{ fontSize: 9, color: '#6B7280', marginTop: 2, textAlign: 'center' }}>Foreign Holding</Text>
+                        )}
+                        {isDomestic && amount > 0 && (
+                          <Text style={{ fontSize: 9, color: GOLD_COLORS.dark, marginTop: 2, textAlign: 'center' }}>
+                            {hideDomestic ? "Hidden" : "Domestic"}
+                          </Text>
+                        )}
                       </View>
                     );
                   })}
@@ -138,7 +175,7 @@ const VaultScreen = ({ navigation }) => {
               {/* Footer Row */}
               <View style={styles.tableRow}>
                 <View style={[styles.tableCell, styles.headerCell]}>
-                  <Text style={styles.headerTextBold}>Vault Total</Text>
+                  <Text style={styles.headerTextBold}>Total Stored</Text>
                 </View>
                 {COUNTRIES.map(vault => (
                   <View key={`f-${vault}`} style={[styles.tableCell, styles.totalCell]}>
@@ -152,6 +189,13 @@ const VaultScreen = ({ navigation }) => {
                 </View>
               </View>
             </View>
+            {error && (
+              <View style={{ marginTop: 10, padding: 10, backgroundColor: '#FFF0F0', borderRadius: 8, borderWidth: 1, borderColor: '#FFCCCC' }}>
+                <Text style={{ color: '#D32F2F', fontSize: 13, textAlign: 'center' }}>
+                  {error}
+                </Text>
+              </View>
+            )}
           </ScrollView>
         </View>
 
@@ -181,17 +225,20 @@ const VaultScreen = ({ navigation }) => {
                     if (amount === 0) return null;
                     
                     const isDomestic = owner === vault;
+                    const isMyCountry = owner === myCountry;
+                    const isAdmin = isAdminAddress(walletAddress);
+                    const hideDomestic = isDomestic && !isMyCountry && !isAdmin;
                     const percentage = ((amount / vaultTotal) * 100).toFixed(0);
                     
                     return (
                       <View key={`bd-row-${owner}-${vault}`} style={styles.breakdownRow}>
                         <View style={styles.breakdownRowHeader}>
                           <Text style={styles.breakdownOwner}>
-                            {owner} {isDomestic ? <Text style={styles.domesticLabel}>(domestic)</Text> : null}
+                            {owner} {isDomestic ? <Text style={styles.domesticLabel}>({hideDomestic ? 'Hidden' : 'domestic'})</Text> : null}
                           </Text>
-                          <Text style={styles.breakdownAmount}>{percentage}%</Text>
+                          <Text style={styles.breakdownAmount}>{hideDomestic ? '***%' : `${percentage}%`}</Text>
                         </View>
-                        <Text style={styles.breakdownSubAmount}>{formatNumber(amount)} GRX</Text>
+                        <Text style={styles.breakdownSubAmount}>{hideDomestic ? '**** GRX' : `${formatNumber(amount)} GRX`}</Text>
                         <View style={styles.progressBarBg}>
                           <View style={[styles.progressBarFill, { width: `${percentage}%`, backgroundColor: isDomestic ? GOLD_COLORS.primary : GOLD_COLORS.dark }]} />
                         </View>

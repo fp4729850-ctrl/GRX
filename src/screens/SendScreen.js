@@ -453,39 +453,23 @@ const SendScreen = ({ navigation }) => {
 
   const handleSend = () => {
     console.log("Send button clicked. State:", { grxSendDisabled, recipient, amount, balance: grxBalance });
+    setErrorMessage('');
     
     if (grxSendDisabled) {
       console.log("Error: grxSendDisabled is true");
-      try {
-        Alert.alert(
-          'Live pricing unavailable',
-          'Oracle snapshot is stale or gold price unavailable. Refresh pricing before sending.',
-          [
-            {
-              text: 'Refresh',
-              onPress: refreshPricing,
-            },
-            {
-              text: 'Cancel',
-              style: 'cancel',
-            },
-          ]
-        );
-      } catch (e) {
-        window.alert('Oracle snapshot is stale. Refresh pricing before sending.');
-      }
+      setErrorMessage('Oracle snapshot is stale. Refresh pricing before sending.');
       return;
     }
 
     if (!recipient || !validateAddress(recipient)) {
       console.log("Error: invalid recipient address:", recipient);
-      try { Alert.alert('Error', 'Please enter a valid recipient address'); } catch(e) { window.alert('Please enter a valid recipient address'); }
+      setErrorMessage('Please enter a valid recipient address (must start with "grx").');
       return;
     }
 
     if (!amount || !validateAmount(amount)) {
       console.log("Error: invalid amount:", amount);
-      try { Alert.alert('Error', 'Please enter a valid amount'); } catch(e) { window.alert('Please enter a valid amount'); }
+      setErrorMessage('Please enter a valid amount.');
       return;
     }
 
@@ -493,7 +477,7 @@ const SendScreen = ({ navigation }) => {
     const balance = grxBalance || DUMMY_GRX_BALANCE;
     if (parseFloat(amount) > parseFloat(balance)) {
       console.log("Error: insufficient balance");
-      try { Alert.alert('Error', 'Insufficient balance'); } catch(e) { window.alert('Insufficient balance'); }
+      setErrorMessage(`Insufficient balance. You have ${balance} GRX.`);
       return;
     }
 

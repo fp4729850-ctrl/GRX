@@ -1,7 +1,9 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, Dimensions, Platform } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, Dimensions, Platform, ActivityIndicator } from 'react-native';
 import { MaterialIcons, Ionicons } from '@expo/vector-icons';
 import { theme } from '../../styles/theme';
+import { getWalletMappings } from '../../services/storageService';
+import { fetchGRXBalance } from '../../services/grxChainService';
 
 // Gold color constants
 const GOLD_COLORS = {
@@ -26,17 +28,41 @@ const DUMMY_STATS = {
   ],
 };
 
-const StatCard = ({ icon, label, value, color = GOLD_COLORS.primary }) => (
+const StatCard = ({ icon, label, value, color = GOLD_COLORS.primary, loading = false }) => (
   <View style={styles.statCard}>
     <View style={[styles.statIconContainer, { backgroundColor: color + '20' }]}>
       <MaterialIcons name={icon} size={32} color={color} />
     </View>
-    <Text style={styles.statValue}>{value}</Text>
+    {loading ? <ActivityIndicator size="small" color={color} style={{ marginVertical: 4 }} /> : <Text style={styles.statValue}>{value}</Text>}
     <Text style={styles.statLabel}>{label}</Text>
   </View>
 );
 
 const AdminDashboard = () => {
+  const [adminFees, setAdminFees] = useState('0.0000');
+  const [loadingFees, setLoadingFees] = useState(false);
+
+  useEffect(() => {
+    const fetchAdminFees = async () => {
+      setLoadingFees(true);
+      try {
+        const mappings = await getWalletMappings();
+        // Look for 'Admin' or 'admin' in the mappings
+        const adminMapping = mappings.find(m => m.country.toLowerCase() === 'admin');
+        if (adminMapping?.address) {
+          const balance = await fetchGRXBalance(adminMapping.address);
+          setAdminFees(balance);
+        }
+      } catch (err) {
+        console.error('Failed to fetch admin fees:', err);
+      } finally {
+        setLoadingFees(false);
+      }
+    };
+    
+    fetchAdminFees();
+  }, []);
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.header}>
@@ -45,6 +71,13 @@ const AdminDashboard = () => {
       </View>
 
       <View style={styles.statsGrid}>
+        <StatCard
+          icon="account-balance-wallet"
+          label="Total Fees Collected"
+          value={`${adminFees} GRX`}
+          color={theme.colors.success}
+          loading={loadingFees}
+        />
         <StatCard
           icon="people"
           label="Total Users"

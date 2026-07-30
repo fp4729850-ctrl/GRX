@@ -3,6 +3,9 @@ import { API_BASE_URL } from '../utils/constants';
 import { getAuthToken, clearAuthToken } from './storageService';
 
 const requireApiBase = () => {
+  if (typeof window !== 'undefined') {
+    return ''; // Use relative URL in browser to bypass DNS blocks via proxy
+  }
   if (!API_BASE_URL) {
     throw new Error(
       'API base URL missing. Set EXPO_PUBLIC_API_BASE_URL to enable backend connectivity.',

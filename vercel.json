@@ -1,3 +1,25 @@
 {
-  "outputDirectory": "dist"
+  "outputDirectory": "dist",
+  "rewrites": [
+    {
+      "source": "/api/ownership-data/:match*",
+      "destination": "https://api.grxglobal.in/api/claim-matrix/:match*"
+    },
+    {
+      "source": "/api/ownership-data",
+      "destination": "https://api.grxglobal.in/api/claim-matrix"
+    },
+    {
+      "source": "/api/:match*",
+      "destination": "https://api.grxglobal.in/api/:match*"
+    },
+    {
+      "source": "/cosmos/:match*",
+      "destination": "https://api.grxglobal.in/cosmos/:match*"
+    },
+    {
+      "source": "/rpc/:match*",
+      "destination": "https://rpc.grxglobal.in/:match*"
+    }
+  ]
 }

@@ -89,6 +89,15 @@ export const fetchGRXBalance = async (address) => {
       return '0';
     }
 
+    let url = `${restUrl}/cosmos/bank/v1beta1/balances/${address}`;
+    
+    // In browser environments, use relative URL so Vercel can proxy it
+    // This completely bypasses any local DNS blocks or Adblockers!
+    const isBrowser = typeof window !== 'undefined';
+    if (isBrowser) {
+      url = `/cosmos/bank/v1beta1/balances/${address}`;
+    }
+
     // Check if address is valid
     if (!address || typeof address !== 'string') {
       // Silently return 0 for invalid addresses
@@ -102,7 +111,7 @@ export const fetchGRXBalance = async (address) => {
     try {
       // Suppress console errors by wrapping in try-catch
       // Note: Browser will still log network errors, but we handle them gracefully
-      const response = await fetch(`${restUrl}/cosmos/bank/v1beta1/balances/${address}`, {
+      const response = await fetch(url, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -165,7 +174,11 @@ export const fetchGRXBalance = async (address) => {
  */
 export const createMintTransaction = async (mnemonic, mintDetails) => {
   try {
-    const rpcUrl = GRX_CHAIN_CONFIG.RPC_URL;
+    let rpcUrl = GRX_CHAIN_CONFIG.RPC_URL;
+    if (typeof window !== 'undefined') {
+      rpcUrl = '/rpc';
+    }
+    
     if (!rpcUrl) {
       throw new Error('GRX RPC URL not configured');
     }
@@ -258,7 +271,11 @@ export const createMintTransaction = async (mnemonic, mintDetails) => {
  */
 export const burnGRX = async (mnemonic, amount) => {
   try {
-    const rpcUrl = GRX_CHAIN_CONFIG.RPC_URL;
+    let rpcUrl = GRX_CHAIN_CONFIG.RPC_URL;
+    if (typeof window !== 'undefined') {
+      rpcUrl = '/rpc';
+    }
+    
     if (!rpcUrl) {
       throw new Error('GRX RPC URL not configured');
     }
@@ -352,7 +369,11 @@ export const burnGRX = async (mnemonic, amount) => {
  */
 export const sendGRXTokens = async (mnemonic, recipient, amount, memo = '') => {
   try {
-    const rpcUrl = GRX_CHAIN_CONFIG.RPC_URL;
+    let rpcUrl = GRX_CHAIN_CONFIG.RPC_URL;
+    if (typeof window !== 'undefined') {
+      rpcUrl = '/rpc';
+    }
+    
     if (!rpcUrl) {
       throw new Error('GRX RPC URL not configured');
     }
